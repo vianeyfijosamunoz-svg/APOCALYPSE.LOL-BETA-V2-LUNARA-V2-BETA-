@@ -185,192 +185,10 @@ local Window = Library:CreateWindow({
 local Tabs = {
     ["COUNTERS GG V2"] = Window:AddTab("COUNTERS GG V2", "home"),
     ["Ragebot"] = Window:AddTab("Ragebot", "crosshair"),
-    ["COMBAT"] = Window:AddTab("COMBAT", "crosshair"),
     ["Visuals"] = Window:AddTab("Visuals", "eye"),
     ["Misc"] = Window:AddTab("Misc", "settings"),
     ["UI Settings"] = Window:AddTab("UI Settings", "settings")
 }
-
-getgenv().AimbotConfig = {
-    Enabled = false,
-    WallCheck = true,
-    Smoothing = 5,
-    Radius = 150,
-    ShowFOV = true,
-    MaxDistance = 1500,
-    BodyPart = "Head"
-}
-
-getgenv().SilentAimConfig = {
-    Enabled = true,
-    SoftLockEnabled = false,
-    MaxDistance = 500,
-    Radius = 180,
-    ShowFOV = true,
-    BodyPart = "Head"
-}
-
-local bodyPartsList = {
-    "Head", "HumanoidRootPart", "UpperTorso", "LowerTorso", "Torso",
-    "LeftUpperArm", "LeftLowerArm", "LeftHand", "RightUpperArm", "RightLowerArm",
-    "RightHand", "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", "RightUpperLeg",
-    "RightLowerLeg", "RightFoot", "Left Leg", "Right Leg", "Left Arm",
-    "Right Arm", "LeftFoot", "RightFoot", "RootPart", "DisplayPart",
-    "Chest", "Stomach", "Neck", "Face", "Pelvis"
-}
-
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Thickness = 1
-FOVCircle.NumSides = 64
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.7
-FOVCircle.Color = Color3.fromRGB(0, 255, 128)
-FOVCircle.Visible = false
-
-local SilentFOVCircle = Drawing.new("Circle")
-SilentFOVCircle.Thickness = 1
-SilentFOVCircle.NumSides = 64
-SilentFOVCircle.Filled = false
-SilentFOVCircle.Transparency = 0.7
-SilentFOVCircle.Color = Color3.fromRGB(255, 0, 128)
-SilentFOVCircle.Visible = false
-
-local AimbotGroup = Tabs["COMBAT"]:AddLeftGroupbox("AIMBOT")
-
-AimbotGroup:AddToggle("AimbotEnabled", {
-    Text = "ENABLED",
-    Default = false,
-    Callback = function(Value)
-        getgenv().AimbotConfig.Enabled = Value
-        Library:Notify(Value and "ENABLED (AIMBOT)" or "DISABLED (AIMBOT)", 2)
-    end
-})
-
-AimbotGroup:AddDropdown("AimbotBodyPart", {
-    Values = bodyPartsList,
-    Default = 1,
-    Multi = false,
-    Text = "Body Part",
-    Callback = function(Value)
-        getgenv().AimbotConfig.BodyPart = Value
-        Library:Notify("ENABLED (BODY PART: " .. string.upper(Value) .. ")", 2)
-    end
-})
-
-AimbotGroup:AddToggle("AimbotWallCheck", {
-    Text = "Wall Check",
-    Default = true,
-    Callback = function(Value)
-        getgenv().AimbotConfig.WallCheck = Value
-        Library:Notify(Value and "ENABLED (WALL CHECK)" or "DISABLED (WALL CHECK)", 2)
-    end
-})
-
-AimbotGroup:AddSlider("AimbotSmoothing", {
-    Text = "Smoothing",
-    Default = 5,
-    Min = 1,
-    Max = 30,
-    Rounding = 1,
-    Callback = function(Value)
-        getgenv().AimbotConfig.Smoothing = Value
-    end
-})
-
-AimbotGroup:AddSlider("AimbotFOVRadius", {
-    Text = "FOV Radius",
-    Default = 150,
-    Min = 20,
-    Max = 600,
-    Rounding = 0,
-    Callback = function(Value)
-        getgenv().AimbotConfig.Radius = Value
-    end
-})
-
-AimbotGroup:AddToggle("AimbotShowFOV", {
-    Text = "Show FOV",
-    Default = true,
-    Callback = function(Value)
-        getgenv().AimbotConfig.ShowFOV = Value
-        FOVCircle.Visible = Value
-        Library:Notify(Value and "ENABLED (SHOW FOV)" or "DISABLED (SHOW FOV)", 2)
-    end
-})
-
-AimbotGroup:AddSlider("AimbotMaxDistance", {
-    Text = "Max Distance (Studs)",
-    Default = 1500,
-    Min = 100,
-    Max = 5000,
-    Rounding = 0,
-    Callback = function(Value)
-        getgenv().AimbotConfig.MaxDistance = Value
-    end
-})
-
-local SilentAimGroup = Tabs["COMBAT"]:AddRightGroupbox("SILENT AIM")
-
-SilentAimGroup:AddToggle("SilentAimEnabled", {
-    Text = "ENABLED",
-    Default = true,
-    Callback = function(Value)
-        getgenv().SilentAimConfig.Enabled = Value
-        Library:Notify(Value and "ENABLED (SILENT AIM)" or "DISABLED (SILENT AIM)", 2)
-    end
-})
-
-SilentAimGroup:AddToggle("SoftLockEnabled", {
-    Text = "SoftLock FOV Mode",
-    Default = false,
-    Callback = function(Value)
-        getgenv().SilentAimConfig.SoftLockEnabled = Value
-        Library:Notify(Value and "ENABLED (SOFTLOCK)" or "DISABLED (SOFTLOCK)", 2)
-    end
-})
-
-SilentAimGroup:AddDropdown("SilentBodyPart", {
-    Values = bodyPartsList,
-    Default = 1,
-    Multi = false,
-    Text = "Body Part",
-    Callback = function(Value)
-        getgenv().SilentAimConfig.BodyPart = Value
-        Library:Notify("ENABLED (SILENT BODY PART: " .. string.upper(Value) .. ")", 2)
-    end
-})
-
-SilentAimGroup:AddSlider("SilentMaxDistance", {
-    Text = "Max Distance",
-    Default = 500,
-    Min = 50,
-    Max = 3000,
-    Rounding = 0,
-    Callback = function(Value)
-        getgenv().SilentAimConfig.MaxDistance = Value
-    end
-})
-
-SilentAimGroup:AddSlider("SilentRadius", {
-    Text = "Radius (FOV)",
-    Default = 180,
-    Min = 10,
-    Max = 600,
-    Rounding = 0,
-    Callback = function(Value)
-        getgenv().SilentAimConfig.Radius = Value
-    end
-})
-
-SilentAimGroup:AddToggle("SilentShowFOV", {
-    Text = "Show FOV",
-    Default = true,
-    Callback = function(Value)
-        getgenv().SilentAimConfig.ShowFOV = Value
-        SilentFOVCircle.Visible = Value
-        Library:Notify(Value and "ENABLED (SILENT SHOW FOV)" or "DISABLED (SILENT SHOW FOV)", 2)
-    end
-})
 
 local MainGroup = Tabs["COUNTERS GG V2"]:AddLeftGroupbox("UE COUNTER")
 
@@ -379,7 +197,6 @@ MainGroup:AddToggle("UEKillersToggle", {
     Default = false,
     Callback = function(Value)
         isUEKillersOn = Value
-        Library:Notify(Value and "ENABLED (UE KILLERS)" or "DISABLED (UE KILLERS)", 2)
     end
 })
 
@@ -432,7 +249,6 @@ MainGroup:AddToggle("UENoCollision", {
     Default = true,
     Callback = function(Value)
         ueNoCollision = Value
-        Library:Notify(Value and "ENABLED (UE NO COLLISION)" or "DISABLED (UE NO COLLISION)", 2)
     end
 })
 
@@ -441,7 +257,6 @@ MainGroup:AddToggle("UEGodmode", {
     Default = true,
     Callback = function(Value)
         ueGodmode = Value
-        Library:Notify(Value and "ENABLED (UE GODMODE)" or "DISABLED (UE GODMODE)", 2)
     end
 })
 
@@ -450,7 +265,6 @@ MainGroup:AddToggle("UEAutoEquip", {
     Default = true,
     Callback = function(Value)
         ueAutoEquip = Value
-        Library:Notify(Value and "ENABLED (UE AUTO EQUIP)" or "DISABLED (UE AUTO EQUIP)", 2)
     end
 })
 
@@ -459,7 +273,6 @@ MainGroup:AddToggle("UEShoot", {
     Default = true,
     Callback = function(Value)
         ueShoot = Value
-        Library:Notify(Value and "ENABLED (UE SHOOT)" or "DISABLED (UE SHOOT)", 2)
     end
 })
 
@@ -470,7 +283,6 @@ AxeGroup:AddToggle("AxeCounterToggle", {
     Default = false,
     Callback = function(Value)
         isAxeCounterOn = Value
-        Library:Notify(Value and "ENABLED (AXE COUNTER)" or "DISABLED (AXE COUNTER)", 2)
     end
 })
 
@@ -512,7 +324,6 @@ AxeGroup:AddToggle("RandomJointsToggle", {
     Default = true,
     Callback = function(Value)
         randomJoints = Value
-        Library:Notify(Value and "ENABLED (RANDOM JOINTS)" or "DISABLED (RANDOM JOINTS)", 2)
     end
 })
 
@@ -521,7 +332,6 @@ AxeGroup:AddToggle("ForceNoCollision", {
     Default = true,
     Callback = function(Value)
         forceNoCollision = Value
-        Library:Notify(Value and "ENABLED (FORCE NO COLLISION)" or "DISABLED (FORCE NO COLLISION)", 2)
     end
 })
 
@@ -532,7 +342,6 @@ RageGroup:AddToggle("RagebotToggle", {
     Default = false,
     Callback = function(Value)
         isRagebotOn = Value
-        Library:Notify(Value and "ENABLED (RAGEBOT)" or "DISABLED (RAGEBOT)", 2)
         if not Value then
             StatusLabel.Text = "VOID"
             isInVoidPhase = false
@@ -546,7 +355,6 @@ RageGroup:AddToggle("ManipulacionToggle", {
     Default = false,
     Callback = function(Value)
         isManipulacionOn = Value
-        Library:Notify(Value and "ENABLED (MANIPULACION)" or "DISABLED (MANIPULACION)", 2)
     end
 })
 
@@ -555,7 +363,6 @@ RageGroup:AddToggle("UndergroundManipulationToggle", {
     Default = false,
     Callback = function(Value)
         UndergroundManipulationEnabled = Value
-        Library:Notify(Value and "ENABLED (UNDERGROUND MANIPULATION)" or "DISABLED (UNDERGROUND MANIPULATION)", 2)
         if not Value then
             undergroundAnchorPos = nil
         end
@@ -567,7 +374,6 @@ RageGroup:AddToggle("VoidPhaseToggle", {
     Default = false,
     Callback = function(Value)
         VoidPhaseEnabled = Value
-        Library:Notify(Value and "ENABLED (VOID PHASE)" or "DISABLED (VOID PHASE)", 2)
     end
 })
 
@@ -576,7 +382,6 @@ RageGroup:AddToggle("ResolverToggle", {
     Default = false,
     Callback = function(Value)
         ResolverEnabled = Value
-        Library:Notify(Value and "ENABLED (RESOLVER)" or "DISABLED (RESOLVER)", 2)
     end
 })
 
@@ -585,7 +390,6 @@ RageGroup:AddToggle("AntiCounterToggle", {
     Default = false,
     Callback = function(Value)
         AntiCounterEnabled = Value
-        Library:Notify(Value and "ENABLED (ANTI COUNTER)" or "DISABLED (ANTI COUNTER)", 2)
     end
 })
 
@@ -607,7 +411,6 @@ RageGroup:AddToggle("RandomStatusToggle", {
     Default = false,
     Callback = function(Value)
         randomStatusMode = Value
-        Library:Notify(Value and "ENABLED (RANDOM STATUS MODE)" or "DISABLED (RANDOM STATUS MODE)", 2)
     end
 })
 
@@ -639,7 +442,6 @@ RageGroup:AddLabel("Ragebot Keybind"):AddKeyPicker("RagebotKeybind", {
     Mode = "Toggle",
     Callback = function(Value)
         isRagebotOn = Value
-        Library:Notify(Value and "ENABLED (RAGEBOT KEYBIND)" or "DISABLED (RAGEBOT KEYBIND)", 2)
         if Options.RagebotToggle then
             Options.RagebotToggle:SetValue(Value)
         end
@@ -691,7 +493,6 @@ PriorityGroup:AddToggle("AutoPrioritizedToggle", {
     Default = true,
     Callback = function(Value)
         AutoPrioritized = Value
-        Library:Notify(Value and "ENABLED (AUTO PRIORITIZED)" or "DISABLED (AUTO PRIORITIZED)", 2)
     end
 })
 
@@ -712,7 +513,6 @@ ESPGroup:AddToggle("ESPEnabled", {
     Default = false,
     Callback = function(Value)
         ESPEnabled = Value
-        Library:Notify(Value and "ENABLED (ESP)" or "DISABLED (ESP)", 2)
     end
 })
 
@@ -721,7 +521,6 @@ ESPGroup:AddToggle("ESPBox", {
     Default = false,
     Callback = function(Value)
         ESPBox = Value
-        Library:Notify(Value and "ENABLED (BOX ESP)" or "DISABLED (BOX ESP)", 2)
     end
 })
 
@@ -730,7 +529,6 @@ ESPGroup:AddToggle("ESPName", {
     Default = false,
     Callback = function(Value)
         ESPName = Value
-        Library:Notify(Value and "ENABLED (NAME ESP)" or "DISABLED (NAME ESP)", 2)
     end
 })
 
@@ -739,7 +537,6 @@ ESPGroup:AddToggle("ESPDistance", {
     Default = false,
     Callback = function(Value)
         ESPDistance = Value
-        Library:Notify(Value and "ENABLED (DISTANCE ESP)" or "DISABLED (DISTANCE ESP)", 2)
     end
 })
 
@@ -748,7 +545,6 @@ ESPGroup:AddToggle("ESPHealth", {
     Default = false,
     Callback = function(Value)
         ESPHealth = Value
-        Library:Notify(Value and "ENABLED (HEALTH ESP)" or "DISABLED (HEALTH ESP)", 2)
     end
 })
 
@@ -757,7 +553,6 @@ ESPGroup:AddToggle("ESPTracer", {
     Default = false,
     Callback = function(Value)
         ESPTracer = Value
-        Library:Notify(Value and "ENABLED (TRACERS)" or "DISABLED (TRACERS)", 2)
     end
 })
 
@@ -766,7 +561,6 @@ ESPGroup:AddToggle("ESPChams", {
     Default = false,
     Callback = function(Value)
         ESPChams = Value
-        Library:Notify(Value and "ENABLED (CHAMS)" or "DISABLED (CHAMS)", 2)
     end
 })
 
@@ -775,7 +569,6 @@ ESPGroup:AddToggle("ESPHeadDot", {
     Default = false,
     Callback = function(Value)
         ESPHeadDot = Value
-        Library:Notify(Value and "ENABLED (HEAD DOT)" or "DISABLED (HEAD DOT)", 2)
     end
 })
 
@@ -784,7 +577,6 @@ ESPGroup:AddToggle("ESPOffscreenArrows", {
     Default = false,
     Callback = function(Value)
         ESPOffscreenArrows = Value
-        Library:Notify(Value and "ENABLED (OFFSCREEN ARROWS)" or "DISABLED (OFFSCREEN ARROWS)", 2)
     end
 })
 
@@ -793,7 +585,6 @@ ESPGroup:AddToggle("ESPTeamCheck", {
     Default = true,
     Callback = function(Value)
         ESPTeamCheck = Value
-        Library:Notify(Value and "ENABLED (TEAM CHECK)" or "DISABLED (TEAM CHECK)", 2)
     end
 })
 
@@ -1691,7 +1482,6 @@ WorldGroup:AddToggle("WorldBloom", {
     Text = "Bloom",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (BLOOM)" or "DISABLED (BLOOM)", 2)
         if Value then
             local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
             bloom.Intensity = 0.8
@@ -1709,7 +1499,6 @@ WorldGroup:AddToggle("WorldAtmosphere", {
     Text = "Atmosphere",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (ATMOSPHERE)" or "DISABLED (ATMOSPHERE)", 2)
         if Value then
             local atm = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
             atm.Density = 0.3
@@ -1730,7 +1519,6 @@ WorldGroup:AddToggle("WorldColorCorrection", {
     Text = "Color Correction",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (COLOR CORRECTION)" or "DISABLED (COLOR CORRECTION)", 2)
         if Value then
             local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect")
             cc.Brightness = 0.05
@@ -1749,7 +1537,6 @@ WorldGroup:AddToggle("WorldSunRays", {
     Text = "Sun Rays",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (SUN RAYS)" or "DISABLED (SUN RAYS)", 2)
         if Value then
             local sr = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
             sr.Intensity = 0.15
@@ -1766,7 +1553,6 @@ WorldGroup:AddToggle("WorldDepthOfField", {
     Text = "Depth Of Field",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (DEPTH OF FIELD)" or "DISABLED (DEPTH OF FIELD)", 2)
         if Value then
             local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect") or Instance.new("DepthOfFieldEffect")
             dof.FarIntensity = 0.3
@@ -1785,7 +1571,6 @@ WorldGroup:AddToggle("WorldBlur", {
     Text = "Blur",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (BLUR)" or "DISABLED (BLUR)", 2)
         if Value then
             local blur = Lighting:FindFirstChildOfClass("BlurEffect") or Instance.new("BlurEffect")
             blur.Size = 8
@@ -1857,7 +1642,6 @@ WorldGroup:AddToggle("WorldGlobalShadows", {
     Default = true,
     Callback = function(Value)
         Lighting.GlobalShadows = Value
-        Library:Notify(Value and "ENABLED (GLOBAL SHADOWS)" or "DISABLED (GLOBAL SHADOWS)", 2)
     end
 })
 
@@ -1868,7 +1652,6 @@ MiscLeft:AddToggle("MiscInfiniteJump", {
     Default = false,
     Callback = function(Value)
         getgenv().InfiniteJump = Value
-        Library:Notify(Value and "ENABLED (INFINITE JUMP)" or "DISABLED (INFINITE JUMP)", 2)
     end
 })
 
@@ -1877,7 +1660,6 @@ MiscLeft:AddToggle("MiscNoclip", {
     Default = false,
     Callback = function(Value)
         getgenv().Noclip = Value
-        Library:Notify(Value and "ENABLED (NOCLIP)" or "DISABLED (NOCLIP)", 2)
     end
 })
 
@@ -1886,7 +1668,6 @@ MiscLeft:AddToggle("MiscAntiAFK", {
     Default = true,
     Callback = function(Value)
         getgenv().AntiAFK = Value
-        Library:Notify(Value and "ENABLED (ANTI AFK)" or "DISABLED (ANTI AFK)", 2)
     end
 })
 
@@ -1895,7 +1676,6 @@ MiscLeft:AddToggle("MiscGodMode", {
     Default = false,
     Callback = function(Value)
         getgenv().GodMode = Value
-        Library:Notify(Value and "ENABLED (CLIENT GODMODE)" or "DISABLED (CLIENT GODMODE)", 2)
     end
 })
 
@@ -1904,7 +1684,6 @@ MiscLeft:AddToggle("MiscAutoRespawn", {
     Default = false,
     Callback = function(Value)
         getgenv().AutoRespawn = Value
-        Library:Notify(Value and "ENABLED (AUTO RESPAWN)" or "DISABLED (AUTO RESPAWN)", 2)
     end
 })
 
@@ -1913,7 +1692,6 @@ MiscLeft:AddToggle("MiscAntiSit", {
     Default = false,
     Callback = function(Value)
         getgenv().AntiSit = Value
-        Library:Notify(Value and "ENABLED (ANTI SIT)" or "DISABLED (ANTI SIT)", 2)
     end
 })
 
@@ -1922,7 +1700,6 @@ MiscLeft:AddToggle("MiscAntiRagdoll", {
     Default = false,
     Callback = function(Value)
         getgenv().AntiRagdoll = Value
-        Library:Notify(Value and "ENABLED (ANTI RAGDOLL)" or "DISABLED (ANTI RAGDOLL)", 2)
     end
 })
 
@@ -1931,7 +1708,6 @@ MiscLeft:AddToggle("MiscNoFallDamage", {
     Default = false,
     Callback = function(Value)
         getgenv().NoFallDamage = Value
-        Library:Notify(Value and "ENABLED (NO FALL DAMAGE)" or "DISABLED (NO FALL DAMAGE)", 2)
     end
 })
 
@@ -1940,7 +1716,6 @@ MiscLeft:AddToggle("SpinbotEnabled", {
     Default = false,
     Callback = function(Value)
         SpinbotEnabled = Value
-        Library:Notify(Value and "ENABLED (SPINBOT)" or "DISABLED (SPINBOT)", 2)
     end
 })
 
@@ -2019,7 +1794,6 @@ MiscRight:AddToggle("AntiAimToggle", {
     Default = false,
     Callback = function(Value)
         AntiAimEnabled = Value
-        Library:Notify(Value and "ENABLED (ANTI-AIM)" or "DISABLED (ANTI-AIM)", 2)
         local char = LocalPlayer.Character
         local hum = char and char:FindFirstChildOfClass("Humanoid")
         if hum then
@@ -2053,7 +1827,6 @@ MiscRight:AddToggle("AntiAimDesyncFlick", {
     Default = false,
     Callback = function(Value)
         AntiAimDesyncFlick = Value
-        Library:Notify(Value and "ENABLED (DESYNC FLICK)" or "DISABLED (DESYNC FLICK)", 2)
     end
 })
 
@@ -2095,7 +1868,6 @@ MiscRight:AddToggle("MiscUndergroundToggle", {
     Default = false,
     Callback = function(Value)
         MiscUndergroundEnabled = Value
-        Library:Notify(Value and "ENABLED (UNDERGROUND)" or "DISABLED (UNDERGROUND)", 2)
     end
 })
 
@@ -2145,7 +1917,6 @@ UtilityRight:AddToggle("MiscFullbright", {
     Text = "Fullbright",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (FULLBRIGHT)" or "DISABLED (FULLBRIGHT)", 2)
         if Value then
             Lighting.Brightness = 2
             Lighting.ClockTime = 14
@@ -2160,7 +1931,6 @@ UtilityRight:AddToggle("MiscRemoveFog", {
     Text = "Remove Fog",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (REMOVE FOG)" or "DISABLED (REMOVE FOG)", 2)
         if Value then
             Lighting.FogEnd = 100000
             Lighting.FogStart = 0
@@ -2173,7 +1943,6 @@ UtilityRight:AddToggle("MiscNoTextures", {
     Default = false,
     Callback = function(Value)
         getgenv().NoTextures = Value
-        Library:Notify(Value and "ENABLED (REMOVE TEXTURES)" or "DISABLED (REMOVE TEXTURES)", 2)
         if Value then
             for _, v in pairs(workspace:GetDescendants()) do
                 if v:IsA("Texture") or v:IsA("Decal") then
@@ -2188,7 +1957,6 @@ UtilityRight:AddToggle("MiscZoomUnlock", {
     Text = "Unlock Zoom",
     Default = false,
     Callback = function(Value)
-        Library:Notify(Value and "ENABLED (UNLOCK ZOOM)" or "DISABLED (UNLOCK ZOOM)", 2)
         if Value then
             LocalPlayer.CameraMaxZoomDistance = 9999
             LocalPlayer.CameraMinZoomDistance = 0.5
@@ -2204,7 +1972,6 @@ UtilityRight:AddToggle("MiscShowFPS", {
     Default = false,
     Callback = function(Value)
         getgenv().ShowFPS = Value
-        Library:Notify(Value and "ENABLED (SHOW FPS)" or "DISABLED (SHOW FPS)", 2)
     end
 })
 
@@ -2213,7 +1980,6 @@ UtilityRight:AddToggle("MiscShowPing", {
     Default = false,
     Callback = function(Value)
         getgenv().ShowPing = Value
-        Library:Notify(Value and "ENABLED (SHOW PING)" or "DISABLED (SHOW PING)", 2)
     end
 })
 
@@ -2384,107 +2150,6 @@ local function getClosestTarget(maxDistance)
 
     return bestPlayer, bestRoot, bestHead
 end
-
-local function getClosestAimbotTarget()
-    local bestTarget = nil
-    local shortestDist = getgenv().AimbotConfig.Radius
-    local mousePos = UserInputService:GetMouseLocation()
-    local myChar = LocalPlayer.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
-    if not myRoot then return nil end
-
-    for _, player in ipairs(Players:GetPlayers()) do
-        if isTargetValid(player) then
-            local char = player.Character
-            local part = char and char:FindFirstChild(getgenv().AimbotConfig.BodyPart) or char:FindFirstChild("Head")
-            local humanoid = char:FindFirstChildOfClass("Humanoid")
-
-            if part and humanoid and humanoid.Health > 0 then
-                local dist = (myRoot.Position - part.Position).Magnitude
-                if dist <= getgenv().AimbotConfig.MaxDistance then
-
-                    if getgenv().AimbotConfig.WallCheck then
-                        local rayParams = RaycastParams.new()
-                        rayParams.FilterType = Enum.RaycastFilterType.Exclude
-                        rayParams.FilterDescendantsInstances = {myChar, char}
-                        local rayResult = workspace:Raycast(Camera.CFrame.Position, part.Position - Camera.CFrame.Position, rayParams)
-                        if rayResult then
-                            continue
-                        end
-                    end
-
-                    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-                    if onScreen then
-                        local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
-                        if screenDist < shortestDist then
-                            shortestDist = screenDist
-                            bestTarget = part
-                        end
-                    end
-                end
-            end
-        end
-    end
-
-    return bestTarget
-end
-
-local function getValidSilentPart(char)
-    local partName = getgenv().SilentAimConfig.BodyPart or "Head"
-    local part = char:FindFirstChild(partName) or char:FindFirstChild("Head")
-    if not part then return nil end
-    local params = RaycastParams.new()
-    params.FilterType = Enum.RaycastFilterType.Exclude
-    params.FilterDescendantsInstances = {LocalPlayer.Character, Camera}
-    local result = workspace:Raycast(Camera.CFrame.Position, (part.Position - Camera.CFrame.Position).Unit * 1000, params)
-    return (result == nil or result.Instance:IsDescendantOf(char)) and part or nil
-end
-
-local activeTargetPos = nil
-
-RunService.RenderStepped:Connect(function()
-    local screenCenter = Camera.ViewportSize / 2
-    local bestPart = nil
-    local shortestDist = 9e9
-
-    for _, plr in pairs(Players:GetPlayers()) do
-        local char = plr.Character
-        if char and isEnemy(plr) then
-            local partName = getgenv().SilentAimConfig.BodyPart or "Head"
-            local targetPart = char:FindFirstChild(partName) or char:FindFirstChild("Head")
-            
-            if targetPart then
-                local distFromMe = (targetPart.Position - Camera.CFrame.Position).Magnitude
-                local partPos, partOnScreen = Camera:WorldToViewportPoint(targetPart.Position)
-                local fovDist = (Vector2.new(partPos.X, partPos.Y) - screenCenter).Magnitude
-
-                if partOnScreen and distFromMe <= getgenv().SilentAimConfig.MaxDistance then
-                    if getgenv().SilentAimConfig.SoftLockEnabled then
-                        if fovDist <= getgenv().SilentAimConfig.Radius and fovDist < shortestDist then
-                            local valid = getValidSilentPart(char)
-                            if valid then shortestDist = fovDist; bestPart = valid end
-                        end
-                    elseif getgenv().SilentAimConfig.Enabled then
-                        if fovDist < shortestDist then
-                            local valid = getValidSilentPart(char)
-                            if valid then shortestDist = fovDist; bestPart = valid end
-                        end
-                    end
-                end
-            end
-        end
-    end
-    activeTargetPos = bestPart and bestPart.Position or nil
-end)
-
-local old; old = hookmetamethod(game, "__index", newcclosure(function(self, idx)
-    if (getgenv().SilentAimConfig.Enabled or getgenv().SilentAimConfig.SoftLockEnabled) and activeTargetPos and not checkcaller() and idx == "ViewportSize" and self == Camera then
-        local pos, on = Camera:WorldToViewportPoint(activeTargetPos)
-        if on then return Vector2.new(pos.X * 2, pos.Y * 2) end
-    end
-    return old(self, idx)
-end))
 
 local function bringAllToMe()
     local character = LocalPlayer.Character
@@ -2746,41 +2411,6 @@ end)
 RunService.RenderStepped:Connect(function(dt)
     updateESP()
 
-    local cfg = getgenv().AimbotConfig
-    local silentCfg = getgenv().SilentAimConfig
-    local mousePos = UserInputService:GetMouseLocation()
-
-    if cfg.ShowFOV and cfg.Enabled then
-        FOVCircle.Position = mousePos
-        FOVCircle.Radius = cfg.Radius
-        FOVCircle.Visible = true
-    else
-        FOVCircle.Visible = false
-    end
-
-    if silentCfg.ShowFOV and (silentCfg.Enabled or silentCfg.SoftLockEnabled) then
-        SilentFOVCircle.Position = mousePos
-        SilentFOVCircle.Radius = silentCfg.Radius
-        SilentFOVCircle.Visible = true
-    else
-        SilentFOVCircle.Visible = false
-    end
-
-    if cfg.Enabled then
-        local targetPart = getClosestAimbotTarget()
-        if targetPart then
-            local currentCamCF = Camera.CFrame
-            local targetPosition = targetPart.Position
-            local desiredCFrame = CFrame.new(currentCamCF.Position, targetPosition)
-            
-            if cfg.Smoothing <= 1 then
-                Camera.CFrame = desiredCFrame
-            else
-                Camera.CFrame = currentCamCF:Lerp(desiredCFrame, 1 / cfg.Smoothing)
-            end
-        end
-    end
-
     local char = LocalPlayer.Character
     if char then
         local hum = char:FindFirstChildOfClass("Humanoid")
@@ -2976,19 +2606,8 @@ RunService.RenderStepped:Connect(function()
     end
     
     if ueShoot and getgenv().Config.Enabled then
-        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange * 2)
-        if not targetPlayer then
-            for _, p in ipairs(plrs:GetPlayers()) do
-                if isTargetValid(p) and p.Character and p.Character:FindFirstChild("Head") then
-                    targetPlayer = p
-                    targetHead = p.Character:FindFirstChild("Head")
-                    targetRoot = p.Character:FindFirstChild("HumanoidRootPart")
-                    break
-                end
-            end
-        end
-
-        if targetPlayer and targetHead and hrp then
+        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange)
+        if targetPlayer and targetHead and targetRoot and hrp then
             if FighterController and FighterController.LocalFighter then
                 local item = FighterController.LocalFighter.EquippedItem
                 if item and util and enum then
@@ -2998,9 +2617,9 @@ RunService.RenderStepped:Connect(function()
                     local targetCF = targetHead.CFrame
 
                     local randomOffset = Vector3.new(
-                        (math.random() - 0.5) * 0.1,
-                        (math.random() - 0.5) * 0.1,
-                        (math.random() - 0.5) * 0.1
+                        (math.random() - 0.5) * 0.05,
+                        (math.random() - 0.5) * 0.05,
+                        (math.random() - 0.5) * 0.05
                     )
                     local aimedPos = targetPos + randomOffset
                     local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
@@ -3087,18 +2706,8 @@ RunService.RenderStepped:Connect(function()
     end
 
     if getgenv().Config.Enabled then
-        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange * 2)
-        if not targetPlayer then
-            for _, p in ipairs(plrs:GetPlayers()) do
-                if isTargetValid(p) and p.Character and p.Character:FindFirstChild("Head") then
-                    targetPlayer = p
-                    targetHead = p.Character:FindFirstChild("Head")
-                    break
-                end
-            end
-        end
-
-        if targetPlayer and targetHead then
+        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange)
+        if targetPlayer and targetHead and targetRoot then
             if FighterController and FighterController.LocalFighter then
                 local item = FighterController.LocalFighter.EquippedItem
                 if item and util and enum then
@@ -3108,9 +2717,9 @@ RunService.RenderStepped:Connect(function()
                     local targetCF = targetHead.CFrame
 
                     local randomOffset = Vector3.new(
-                        (math.random() - 0.5) * 0.2,
-                        (math.random() - 0.5) * 0.2,
-                        (math.random() - 0.5) * 0.2
+                        (math.random() - 0.5) * 0.1,
+                        (math.random() - 0.5) * 0.1,
+                        (math.random() - 0.5) * 0.1
                     )
                     local aimedPos = targetPos + randomOffset
                     local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
@@ -3144,7 +2753,7 @@ runS.Heartbeat:Connect(function()
     local currentText = StatusLabel.Text
     if not string.find(currentText, "→") then return end
 
-    local targetPlayer, targetRoot, targetHead = getClosestTarget(autoFireRange * 2)
+    local targetPlayer, targetRoot, targetHead = getClosestTarget(autoFireRange)
     if not targetPlayer or not targetHead or not targetRoot then return end
     
     local char = LocalPlayer.Character
@@ -3177,7 +2786,7 @@ runS.Heartbeat:Connect(function()
 
     pcall(function()
         repS.Remotes.Replication.Fighter.UseItem:FireServer(
-                            item:Get("ObjectID"),
+            item:Get("ObjectID"),
             enum:ToEnum("StartShooting"),
             cameradata,
             nil
@@ -3186,6 +2795,9 @@ runS.Heartbeat:Connect(function()
 end)
 
 task.spawn(function()
+    local lastTarget = nil
+    local lastTargetPos = nil
+
     while true do
         task.wait()
 
@@ -3195,6 +2807,8 @@ task.spawn(function()
 
         if not isRagebotOn then
             StatusLabel.Visible = false
+            lastTarget = nil
+            lastTargetPos = nil
             isInVoidPhase = false
             undergroundAnchorPos = nil
             continue
@@ -3203,39 +2817,140 @@ task.spawn(function()
         StatusLabel.Visible = true
 
         local char = LocalPlayer.Character
-        if not char then continue end
+        if not char then
+            StatusLabel.Text = "VOID - No Character"
+            isInVoidPhase = false
+            continue
+        end
+
         local hrp = char:FindFirstChild("HumanoidRootPart")
         local humanoid = char:FindFirstChildOfClass("Humanoid")
-        if not hrp or not humanoid then continue end
+        if not hrp or not humanoid then
+            StatusLabel.Text = "VOID - No HRP"
+            isInVoidPhase = false
+            continue
+        end
 
-        if tick() - lastKillTime < KillDelay then continue end
+        if tick() - lastKillTime < KillDelay then
+            StatusLabel.Text = "KILL DELAY..."
+            continue
+        end
+
+        local hasWeapon = false
+        if FighterController and FighterController.LocalFighter then
+            local item = FighterController.LocalFighter.EquippedItem
+            if item then
+                local success, objId = pcall(function() return item:Get("ObjectID") end)
+                if success and objId then
+                    hasWeapon = true
+                end
+            end
+        end
+
+        if not hasWeapon then
+            StatusLabel.Text = "WAITING FOR WEAPON..."
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            isInVoidPhase = false
+            continue
+        end
+
+        local closestManipTarget = nil
+        local closestManipDist = 7.5
+
+        if isManipulacionOn then
+            for _, player in ipairs(plrs:GetPlayers()) do
+                if isTargetValid(player) then
+                    local pRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if pRoot then
+                        local dist = (hrp.Position - pRoot.Position).Magnitude
+                        if dist <= closestManipDist then
+                            closestManipDist = dist
+                            closestManipTarget = player
+                        end
+                    end
+                end
+            end
+        end
 
         local targetPlayer, targetRoot, targetHead = getClosestTarget(math.huge)
 
         if not targetPlayer or not targetRoot or not targetHead then
-            StatusLabel.Text = "RAGEBOT - Buscando objetivos..."
+            if lastTarget then
+                lastKillTime = tick()
+            end
+            if not (isManipulacionOn and closestManipTarget) then
+                if UndergroundManipulationEnabled then
+                    StatusLabel.Text = "UNDERGROUND MANIPULATION (35 STUDS)"
+                else
+                    StatusLabel.Text = "VOID - No Target"
+                end
+            end
+            lastTarget = nil
+            lastTargetPos = nil
             hrp.AssemblyLinearVelocity = Vector3.zero
             isInVoidPhase = false
             continue
         end
+
+        if AntiCounterEnabled and targetRoot then
+            local targetVel = targetRoot.AssemblyLinearVelocity.Magnitude
+            local myY = hrp.Position.Y
+            local targetY = targetRoot.Position.Y
+            local isCountering = targetVel > 80 or math.abs(targetY - myY) > 15
+            if isCountering and not (isManipulacionOn and closestManipTarget) then
+                StatusLabel.Text = "ANTI-COUNTER → " .. targetPlayer.Name
+            end
+        end
+
+        local predictedPos = targetRoot.Position
+        lastTarget = targetPlayer
+        lastTargetPos = targetRoot.Position
+
+        isInVoidPhase = false
 
         local prefix = customStatusPrefix
         if randomStatusMode then
             prefix = randomWords[math.random(1, #randomWords)]
         end
 
-        StatusLabel.Text = prefix .. " [AGRESIVO] → " << targetPlayer.Name
+        if isManipulacionOn and closestManipTarget then
+            StatusLabel.Text = prefix .. ": MANIPULATING (" .. closestManipTarget.Name .. ")"
+        else
+            StatusLabel.Text = prefix .. " → " .. targetPlayer.Name
+        end
 
         local attackStart = tick()
-        while isRagebotOn and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") do
-            local currentTargetRoot = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local currentTargetHead = targetPlayer.Character:FindFirstChild("Head")
-            if not currentTargetRoot or not currentTargetHead then break end
+        while isRagebotOn and (tick() - attackStart < 0.95) do
+            if not string.find(StatusLabel.Text, "→") and not string.find(StatusLabel.Text, "MANIPULATING") then break end
 
-            local offset = Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)
-            local finalCF = CFrame.new(currentTargetRoot.Position + offset) * CFrame.Angles(math.rad(-90), 0, 0)
-            
-            hrp.CFrame = finalCF
+            local currentTargetPlayer, currentTargetRoot, currentTargetHead = getClosestTarget(math.huge)
+            if not currentTargetPlayer or not currentTargetRoot or not currentTargetHead then break end
+
+            local currentPredictedPos = currentTargetRoot.Position
+
+            if UndergroundManipulationEnabled then
+                undergroundAnchorPos = currentTargetRoot.Position
+                if tick() - undergroundTimer >= 0 then
+                    undergroundTimer = tick()
+                    local randomX = math.random(-35, 35)
+                    local randomZ = math.random(-35, 35)
+                    currentUndergroundOffset = Vector3.new(randomX, -5, randomZ)
+                end
+                local finalCF = CFrame.new(currentPredictedPos + currentUndergroundOffset + Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)) * CFrame.Angles(math.rad(-90), 0, 0)
+                
+                if (hrp.Position - finalCF.Position).Magnitude > 0 then
+                    hrp.CFrame = finalCF
+                end
+            else
+                local offset = Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)
+                local finalCF = CFrame.new(currentPredictedPos + offset) * CFrame.Angles(math.rad(-90), 0, 0)
+                
+                if (hrp.Position - finalCF.Position).Magnitude > 0 then
+                    hrp.CFrame = finalCF
+                end
+            end
+
             hrp.AssemblyLinearVelocity = Vector3.zero
             hrp.AssemblyAngularVelocity = Vector3.zero
 
@@ -3244,15 +2959,23 @@ task.spawn(function()
                 if item and util and enum then
                     local originPos = hrp.Position
                     local targetPos = currentTargetHead.Position
-                    local aimCF = CFrame.lookAt(originPos, targetPos)
+
+                    local randomOffset = Vector3.new(
+                        (math.random() - 0.5) * 0.035,
+                        (math.random() - 0.5) * 0.035,
+                        (math.random() - 0.5) * 0.035
+                    )
+
+                    local aimCF = CFrame.lookAt(originPos, targetPos + randomOffset)
                     local targetCF = currentTargetHead.CFrame
+                    local objSpaceHeadOffset = currentTargetHead.CFrame:ToObjectSpace(CFrame.new(targetPos + randomOffset))
 
                     local cameradata = {}
                     cameradata[utf8.char(1)] = {
                         [utf8.char(0)] = util:EncodeCFrame(aimCF),
                         [utf8.char(1)] = util:EncodeCFrame(targetCF),
                         [utf8.char(2)] = currentTargetHead,
-                        [utf8.char(3)] = util:EncodeCFrame(CFrame.new())
+                        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
                     }
 
                     pcall(function()
@@ -3267,6 +2990,21 @@ task.spawn(function()
             end
 
             task.wait()
+        end
+
+        if isRagebotOn and VoidPhaseEnabled then
+            isInVoidPhase = true
+            StatusLabel.Text = "VOID PHASE"
+            local voidStartTime = tick()
+
+            while isRagebotOn and (tick() - voidStartTime < 0.05) do
+                hrp.CFrame = hrp.CFrame + Vector3.new(0, 5000000, 0)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 999999999, 0)
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                task.wait()
+            end
+
+            isInVoidPhase = false
         end
     end
 end)
