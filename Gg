@@ -1,3 +1,12 @@
+if game.PlaceId ~= 6035872082 then
+    game:GetService("StarterGui"):SetCore("SendNotification", {
+        Title = "AXE COUNTER GG V2",
+        Text = "Error: Este script es exclusivo para Roblox Rivals.",
+        Duration = 5
+    })
+    return
+end
+
 local UserInputService = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
@@ -51,16 +60,13 @@ local rageOffsetX = 0
 local rageOffsetY = 0
 local rageOffsetZ = 0
 
--- Variables para Underground Manipulation
 local UndergroundManipulationEnabled = false
 local undergroundTimer = 0
 local currentUndergroundOffset = Vector3.new(0, -5, 0)
 local undergroundAnchorPos = nil
 
--- Rango de Auto Fire personalizable
 local autoFireRange = 50
 
--- Personalización del StatusLabel
 local customStatusPrefix = "RAGEBOTING"
 local randomStatusMode = false
 local randomWords = {"APOCALYPSE", "DESTROYING", "ANNIHILATING", "GODMODE", "RAGE", "DOMINATING", "VOID"}
@@ -91,14 +97,16 @@ local ueGodmode = true
 local ueAutoEquip = true
 local ueShoot = true
 
--- Variables para Anti-Aim Rotro (HRP Estático)
 local AntiAimEnabled = false
 local AntiAimMode = "Spin"
+local AntiAimPitch = "None"
 local AntiAimSpeed = 1000
-local AntiAimIntensity = 5
-local frozenRootPosition = nil
+local AntiAimIntensity = 10
+local AntiAimDesyncFlick = false
+local CameraShakeIntensity = 0
+local antiAimAngle = 0
+local lastFlickTime = 0
 
--- Variables para Underground (Nativo solicitado)
 local MiscUndergroundEnabled = false
 
 local ESPEnabled = false
@@ -581,6 +589,883 @@ ESPGroup:AddSlider("ESPMaxDistance", {
     end
 })
 
+local CosmeticsGroup = Tabs["Visuals"]:AddRightGroupbox("Cosmetics")
+
+local cosmeticInstance = nil
+
+CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
+    Text = "Show Cosmetic Changer",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            if not cosmeticInstance then
+                pcall(function()
+                    local TweenService = game:GetService("TweenService")
+                    local HttpService = game:GetService("HttpService")
+                    
+                    local playerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+                    local controllers = playerScripts:WaitForChild("Controllers")
+
+                    local EnumLibrary = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10))
+                    if EnumLibrary then
+                        pcall(function()
+                            EnumLibrary:WaitForEnumBuilder()
+                        end)
+                    end
+
+                    local CosmeticLibrary = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10))
+                    local ItemLibrary = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10))
+                    local DataController = require(controllers:WaitForChild("PlayerDataController", 10))
+
+                    local equipped = {}
+                    local favorites = {}
+                    local currentCategory = "Skin"
+                    local selectedWeapon = nil
+                    local currentWeaponTab = "Primary"
+                    local showOnlyFavorites = false
+
+                    local WEAPON_CATEGORIES = {
+                        Primary = {"Assault Rifle", "Bow", "Burst Rifle", "Crossbow", "Distortion", "Energy Rifle", "Flamethrower", "Grenade Launcher", "Gunblade", "Minigun", "Paintball Gun", "Permafrost", "RPG", "Scepter", "Shotgun", "Sniper", "Wildcat"},
+                        Secondary = {"Daggers", "Energy Pistols", "Exogun", "Flare Gun", "Glass Cannon", "Handgun", "Revolver", "Shorty", "Slingshot", "Spray", "Uzi", "Warper"},
+                        Melee = {"Battle Axe", "Chainsaw", "Fists", "Glast Shard", "Katana", "Knife", "Maul", "Riot Shield", "Scythe", "Spear", "Trowel"},
+                        Utility = {"Flashbang", "Freeze Ray", "Grenade", "Jump Pad", "Medkit", "Molotov", "Satchel", "Smoke Grenade", "Subspace Tripmine", "War Horn", "Warpstone", "Grappler"}
+                    }
+
+                    local function formatAssetId(val)
+                        if not val then return nil end
+                        local str = tostring(val)
+                        if str:find("rbxasset") then
+                            return str
+                        elseif str:match("^%d+$") then
+                            return "rbxassetid://" .. str
+                        end
+                        return str
+                    end
+
+                    local function getAssetImage(targetName, isWeapon)
+                        if isWeapon and ItemLibrary and ItemLibrary.Items then
+                            local item = ItemLibrary.Items[targetName]
+                            if item then
+                                local raw = item.Image or item.Icon or item.Texture or item.TextureId
+                                local formatted = formatAssetId(raw)
+                                if formatted then return formatted end
+                            end
+                        elseif not isWeapon and CosmeticLibrary and CosmeticLibrary.Cosmetics then
+                            local cosmetic = CosmeticLibrary.Cosmetics[targetName]
+                            if cosmetic then
+                                local raw = cosmetic.Image or cosmetic.Icon or cosmetic.Thumbnail or cosmetic.Texture or cosmetic.TextureId
+                                local formatted = formatAssetId(raw)
+                                if formatted then return formatted end
+                            end
+                        end
+                        return "rbxassetid://6023426915"
+                    end
+
+                    local function isWeaponCosmetic(name, cosmetic)
+                        if not name then return false end
+                        local n = tostring(name):lower()
+                        local t = (cosmetic and tostring(cosmetic.Type or ""):lower()) or ""
+                        if t:find("finisher") or t:find("emote") or t:find("dance") or t:find("kill") then
+                            return false
+                        end
+                        if t == "skin" or t == "charm" or t == "wrap" or t == "wrapping" then
+                            return true
+                        end
+                        if n:find("skin") or n:find("charm") or n:find("wrap") then
+                            return true
+                        end
+                        if cosmetic and (cosmetic.Seed or cosmetic.ObjectID or cosmetic.Enum) then
+                            return true
+                        end
+                        return false
+                    end
+
+                    local function cloneCosmetic(name, cosmeticType)
+                        local base = CosmeticLibrary.Cosmetics[name]
+                        if not base then return nil end
+                        local data = {}
+                        for k, v in pairs(base) do
+                            data[k] = v
+                        end
+                        data.Name = name
+                        data.Type = data.Type or cosmeticType or "Skin"
+                        data.Seed = data.Seed or math.random(1, 999999)
+                        if EnumLibrary then
+                            local ok, enumId = pcall(function()
+                                return EnumLibrary:ToEnum(name)
+                            end)
+                            if ok and enumId then
+                                data.Enum = enumId
+                                data.ObjectID = data.ObjectID or enumId
+                            end
+                        end
+                        if data.Inverted == nil then data.Inverted = false end
+                        if data.OnlyUseFavorites == nil then data.OnlyUseFavorites = false end
+                        return data
+                    end
+
+                    local saveFile = "axe_skinchanger/config.json"
+
+                    local function saveConfig()
+                        if not writefile then return end
+                        pcall(function()
+                            local config = {equipped = {}, favorites = favorites}
+                            for weapon, cosmetics in pairs(equipped) do
+                                config.equipped[weapon] = {}
+                                for ctype, cdata in pairs(cosmetics) do
+                                    if cdata and cdata.Name then
+                                        config.equipped[weapon][ctype] = {name = cdata.Name, seed = cdata.Seed}
+                                    end
+                                end
+                            end
+                            makefolder("axe_skinchanger")
+                            writefile(saveFile, HttpService:JSONEncode(config))
+                        end)
+                    end
+
+                    local function loadConfig()
+                        if not (readfile and isfile and isfile(saveFile)) then return end
+                        pcall(function()
+                            local config = HttpService:JSONDecode(readfile(saveFile))
+                            if config.equipped then
+                                for weapon, cosmetics in pairs(config.equipped) do
+                                    equipped[weapon] = {}
+                                    for ctype, cdata in pairs(cosmetics) do
+                                        local cloned = cloneCosmetic(cdata.name, ctype)
+                                        if cloned then
+                                            cloned.Seed = cdata.seed or cloned.Seed
+                                            equipped[weapon][ctype] = cloned
+                                        end
+                                    end
+                                end
+                            end
+                            if config.favorites then
+                                favorites = config.favorites
+                            end
+                        end)
+                    end
+
+                    local originalOwns = CosmeticLibrary.OwnsCosmetic
+                    CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
+                        if name:find("MISSING_") then
+                            return originalOwns(self, inventory, name, weapon)
+                        end
+                        local cosmetic = CosmeticLibrary.Cosmetics[name]
+                        if isWeaponCosmetic(name, cosmetic) then
+                            return true
+                        end
+                        return originalOwns(self, inventory, name, weapon)
+                    end
+
+                    for _, funcName in pairs({"OwnsCosmeticNormally", "OwnsCosmeticUniversally", "OwnsCosmeticForWeapon"}) do
+                        if CosmeticLibrary[funcName] then
+                            CosmeticLibrary[funcName] = function(_, _, name)
+                                local c = CosmeticLibrary.Cosmetics[name]
+                                return isWeaponCosmetic(name, c)
+                            end
+                        end
+                    end
+
+                    local originalGet = DataController.Get
+                    DataController.Get = function(self, key)
+                        local data = originalGet(self, key)
+                        if key == "CosmeticInventory" then
+                            local proxy = {}
+                            for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                                if isWeaponCosmetic(name, cosmetic) then
+                                    proxy[name] = true
+                                end
+                            end
+                            return setmetatable(proxy, {
+                                __index = function(_, k)
+                                    local c = CosmeticLibrary.Cosmetics[k]
+                                    if isWeaponCosmetic(k, c) then
+                                        return true
+                                    end
+                                end
+                            })
+                        end
+                        return data
+                    end
+
+                    local originalGetWeaponData = DataController.GetWeaponData
+                    DataController.GetWeaponData = function(self, weaponName)
+                        local data = originalGetWeaponData(self, weaponName)
+                        if not data then return nil end
+                        local merged = {}
+                        for k, v in pairs(data) do
+                            merged[k] = v
+                        end
+                        merged.Name = weaponName
+                        if equipped[weaponName] then
+                            for ctype, cdata in pairs(equipped[weaponName]) do
+                                merged[ctype] = cdata
+                            end
+                        end
+                        return merged
+                    end
+
+                    local function forceUpdateWeapon(weaponName)
+                        pcall(function()
+                            if DataController.CurrentData then
+                                DataController.CurrentData:Replicate("WeaponInventory")
+                            end
+                        end)
+                    end
+
+                    local showNotify = function(text) end
+
+                    local function equipCosmetic(name, ctype)
+                        if not selectedWeapon then return end
+                        equipped[selectedWeapon] = equipped[selectedWeapon] or {}
+                        local cloned = cloneCosmetic(name, ctype)
+                        if not cloned then return end
+                        equipped[selectedWeapon][ctype] = cloned
+                        forceUpdateWeapon(selectedWeapon)
+                        saveConfig()
+                        showNotify("✓ " .. name)
+
+                        task.delay(0.5, function()
+                            if equipped[selectedWeapon] and equipped[selectedWeapon][ctype] then
+                                local targetCosmetic = equipped[selectedWeapon][ctype]
+                                if EnumLibrary then
+                                    pcall(function()
+                                        local newEnum = EnumLibrary:ToEnum(targetCosmetic.Name)
+                                        if newEnum then
+                                            targetCosmetic.Enum = newEnum
+                                            targetCosmetic.ObjectID = newEnum
+                                        end
+                                    end)
+                                else
+                                    targetCosmetic.ObjectID = math.random(1000, 999999)
+                                end
+                                forceUpdateWeapon(selectedWeapon)
+                            end
+                        end)
+                    end
+
+                    local function unequipCurrent()
+                        if not selectedWeapon then return end
+                        if equipped[selectedWeapon] then
+                            equipped[selectedWeapon][currentCategory] = nil
+                            if not next(equipped[selectedWeapon]) then
+                                equipped[selectedWeapon] = nil
+                            end
+                            forceUpdateWeapon(selectedWeapon)
+                            saveConfig()
+                            showNotify("Removido")
+                        end
+                    end
+
+                    local function randomSkin()
+                        if not selectedWeapon then return end
+                        local list = {}
+                        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local t = tostring(cosmetic.Type or ""):lower()
+                                local n = name:lower()
+                                local match = false
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then match = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then match = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then match = true end
+                                if match then
+                                    table.insert(list, name)
+                                end
+                            end
+                        end
+                        if #list > 0 then
+                            equipCosmetic(list[math.random(1, #list)], currentCategory)
+                        end
+                    end
+
+                    if hookmetamethod then
+                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                        local dataRemotes = remotes and remotes:FindFirstChild("Data")
+                        local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
+                        if equipRemote then
+                            local old
+                            old = hookmetamethod(game, "__namecall", function(self, ...)
+                                if getnamecallmethod() ~= "FireServer" then
+                                    return old(self, ...)
+                                end
+                                local args = {...}
+                                if self == equipRemote then
+                                    local weaponName, cosmeticType, cosmeticName = args[1], args[2], args[3]
+                                    if weaponName then
+                                        equipped[weaponName] = equipped[weaponName] or {}
+                                        if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
+                                            local cloned = cloneCosmetic(cosmeticName, cosmeticType)
+                                            if cloned then
+                                                equipped[weaponName][cosmeticType] = cloned
+                                            end
+                                        else
+                                            equipped[weaponName][cosmeticType] = nil
+                                        end
+                                        task.defer(function()
+                                            forceUpdateWeapon(weaponName)
+                                            saveConfig()
+                                        end)
+                                    end
+                                    return
+                                end
+                                return old(self, ...)
+                            end)
+                        end
+                    end
+
+                    pcall(function()
+                        local ClientItem = require(LocalPlayer.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+                        if ClientItem and ClientItem._CreateViewModel then
+                            local original = ClientItem._CreateViewModel
+                            ClientItem._CreateViewModel = function(self, viewmodelRef)
+                                local weaponName = self.Name
+                                local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
+                                if weaponPlayer == LocalPlayer and equipped[weaponName] and viewmodelRef then
+                                    local dataKey = self:ToEnum("Data")
+                                    local target = viewmodelRef[dataKey] or viewmodelRef.Data
+                                    if target then
+                                        if equipped[weaponName].Skin then
+                                            target[self:ToEnum("Skin") or "Skin"] = equipped[weaponName].Skin
+                                            target[self:ToEnum("Name") or "Name"] = equipped[weaponName].Skin.Name
+                                        end
+                                        if equipped[weaponName].Charm then
+                                            target[self:ToEnum("Charm") or "Charm"] = equipped[weaponName].Charm
+                                        end
+                                        if equipped[weaponName].Wrap then
+                                            target[self:ToEnum("Wrap") or "Wrap"] = equipped[weaponName].Wrap
+                                        end
+                                    end
+                                end
+                                return original(self, viewmodelRef)
+                            end
+                        end
+                    end)
+
+                    local MainGui = Instance.new("ScreenGui")
+                    MainGui.Name = "AxeSkinchangerUI"
+                    MainGui.ResetOnSpawn = false
+                    MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                    MainGui.Parent = (gethui and gethui()) or CoreGui
+                    cosmeticInstance = MainGui
+
+                    local MainFrameUI = Instance.new("Frame")
+                    MainFrameUI.Size = UDim2.new(0, 720, 0, 540)
+                    MainFrameUI.Position = UDim2.new(0.5, -360, 0.5, -270)
+                    MainFrameUI.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    MainFrameUI.BorderSizePixel = 0
+                    MainFrameUI.Visible = true
+                    MainFrameUI.Parent = MainGui
+                    Instance.new("UICorner", MainFrameUI).CornerRadius = UDim.new(0, 8)
+                    local MainStroke = Instance.new("UIStroke")
+                    MainStroke.Color = Color3.fromRGB(35, 35, 35)
+                    MainStroke.Thickness = 1
+                    MainStroke.Parent = MainFrameUI
+
+                    local TitleBar = Instance.new("Frame")
+                    TitleBar.Size = UDim2.new(1, 0, 0, 36)
+                    TitleBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    TitleBar.BorderSizePixel = 0
+                    TitleBar.Parent = MainFrameUI
+                    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 8)
+
+                    local TitleLabel = Instance.new("TextLabel")
+                    TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+                    TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+                    TitleLabel.BackgroundTransparency = 1
+                    TitleLabel.Text = "AXE SKINCHANGER"
+                    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    TitleLabel.TextSize = 11
+                    TitleLabel.Font = Enum.Font.GothamBold
+                    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    TitleLabel.Parent = TitleBar
+
+                    local MinimizeBtn = Instance.new("TextButton")
+                    MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+                    MinimizeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+                    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    MinimizeBtn.BorderSizePixel = 0
+                    MinimizeBtn.Text = "–"
+                    MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    MinimizeBtn.TextSize = 12
+                    MinimizeBtn.Font = Enum.Font.GothamBold
+                    MinimizeBtn.Parent = TitleBar
+                    Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
+
+                    local ContentFrame = Instance.new("Frame")
+                    ContentFrame.Size = UDim2.new(1, 0, 1, -36)
+                    ContentFrame.Position = UDim2.new(0, 0, 0, 36)
+                    ContentFrame.BackgroundTransparency = 1
+                    ContentFrame.Parent = MainFrameUI
+
+                    local MainLayoutFrame = Instance.new("Frame")
+                    MainLayoutFrame.Size = UDim2.new(1, 0, 1, 0)
+                    MainLayoutFrame.BackgroundTransparency = 1
+                    MainLayoutFrame.Parent = ContentFrame
+
+                    local WeaponSection = Instance.new("Frame")
+                    WeaponSection.Size = UDim2.new(1, 0, 0.46, 0)
+                    WeaponSection.Position = UDim2.new(0, 0, 0, 0)
+                    WeaponSection.BackgroundTransparency = 1
+                    WeaponSection.Parent = MainLayoutFrame
+
+                    local TabBar = Instance.new("Frame")
+                    TabBar.Size = UDim2.new(1, -16, 0, 26)
+                    TabBar.Position = UDim2.new(0, 8, 0, 4)
+                    TabBar.BackgroundTransparency = 1
+                    TabBar.Parent = WeaponSection
+
+                    local tabButtons = {}
+                    local tabNames = {"Primary", "Secondary", "Melee", "Utility"}
+                    for i, tabName in ipairs(tabNames) do
+                        local btn = Instance.new("TextButton")
+                        btn.Size = UDim2.new(0.24, -3, 1, 0)
+                        btn.Position = UDim2.new((i - 1) * 0.25, 0, 0, 0)
+                        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                        btn.BorderSizePixel = 0
+                        btn.Text = tabName
+                        btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                        btn.TextSize = 10
+                        btn.Font = Enum.Font.GothamBold
+                        btn.Parent = TabBar
+                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+                        tabButtons[tabName] = btn
+                    end
+
+                    local WeaponSearch = Instance.new("TextBox")
+                    WeaponSearch.Size = UDim2.new(1, -16, 0, 26)
+                    WeaponSearch.Position = UDim2.new(0, 8, 0, 34)
+                    WeaponSearch.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+                    WeaponSearch.BorderSizePixel = 0
+                    WeaponSearch.PlaceholderText = " Buscar arma..."
+                    WeaponSearch.Text = ""
+                    WeaponSearch.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    WeaponSearch.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
+                    WeaponSearch.TextSize = 10
+                    WeaponSearch.Font = Enum.Font.Gotham
+                    WeaponSearch.Parent = WeaponSection
+                    Instance.new("UICorner", WeaponSearch).CornerRadius = UDim.new(0, 4)
+                    local WSearchStroke = Instance.new("UIStroke")
+                    WSearchStroke.Color = Color3.fromRGB(30, 30, 30)
+                    WSearchStroke.Thickness = 1
+                    WSearchStroke.Parent = WeaponSearch
+
+                    local WeaponList = Instance.new("ScrollingFrame")
+                    WeaponList.Size = UDim2.new(1, -16, 1, -66)
+                    WeaponList.Position = UDim2.new(0, 8, 0, 64)
+                    WeaponList.BackgroundTransparency = 1
+                    WeaponList.BorderSizePixel = 0
+                    WeaponList.ScrollBarThickness = 3
+                    WeaponList.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+                    WeaponList.CanvasSize = UDim2.new(0, 0, 0, 0)
+                    WeaponList.Parent = WeaponSection
+
+                    local WeaponGrid = Instance.new("UIGridLayout")
+                    WeaponGrid.CellSize = UDim2.new(0, 78, 0, 78)
+                    WeaponGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+                    WeaponGrid.SortOrder = Enum.SortOrder.Name
+                    WeaponGrid.Parent = WeaponList
+
+                    local WeaponPadding = Instance.new("UIPadding")
+                    WeaponPadding.PaddingTop = UDim.new(0, 4)
+                    WeaponPadding.PaddingLeft = UDim.new(0, 4)
+                    WeaponPadding.PaddingRight = UDim.new(0, 4)
+                    WeaponPadding.Parent = WeaponList
+
+                    local CosmeticSection = Instance.new("Frame")
+                    CosmeticSection.Size = UDim2.new(1, 0, 0.54, 0)
+                    CosmeticSection.Position = UDim2.new(0, 0, 0.46, 0)
+                    CosmeticSection.BackgroundTransparency = 1
+                    CosmeticSection.Parent = MainLayoutFrame
+
+                    local Categories = Instance.new("Frame")
+                    Categories.Size = UDim2.new(1, -16, 0, 26)
+                    Categories.Position = UDim2.new(0, 8, 0, 4)
+                    Categories.BackgroundTransparency = 1
+                    Categories.Parent = CosmeticSection
+
+                    local categoryButtons = {}
+                    local cats = {"Skin", "Charm", "Wrap"}
+                    for i, cat in ipairs(cats) do
+                        local btn = Instance.new("TextButton")
+                        btn.Size = UDim2.new(0.32, -3, 1, 0)
+                        btn.Position = UDim2.new((i - 1) * 0.333, 0, 0, 0)
+                        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                        btn.BorderSizePixel = 0
+                        btn.Text = cat
+                        btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                        btn.TextSize = 10
+                        btn.Font = Enum.Font.GothamBold
+                        btn.Parent = Categories
+                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+                        categoryButtons[cat] = btn
+                    end
+
+                    local SubActionBar = Instance.new("Frame")
+                    SubActionBar.Size = UDim2.new(1, -16, 0, 26)
+                    SubActionBar.Position = UDim2.new(0, 8, 0, 34)
+                    SubActionBar.BackgroundTransparency = 1
+                    SubActionBar.Parent = CosmeticSection
+
+                    local RandomBtn = Instance.new("TextButton")
+                    RandomBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    RandomBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    RandomBtn.BorderSizePixel = 0
+                    RandomBtn.Text = "Rand"
+                    RandomBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    RandomBtn.TextSize = 10
+                    RandomBtn.Font = Enum.Font.GothamBold
+                    RandomBtn.Parent = SubActionBar
+                    Instance.new("UICorner", RandomBtn).CornerRadius = UDim.new(0, 4)
+
+                    local UnequipBtn = Instance.new("TextButton")
+                    UnequipBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    UnequipBtn.Position = UDim2.new(0.333, 0, 0, 0)
+                    UnequipBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    UnequipBtn.BorderSizePixel = 0
+                    UnequipBtn.Text = "Quit"
+                    UnequipBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    UnequipBtn.TextSize = 10
+                    UnequipBtn.Font = Enum.Font.GothamBold
+                    UnequipBtn.Parent = SubActionBar
+                    Instance.new("UICorner", UnequipBtn).CornerRadius = UDim.new(0, 4)
+
+                    local FavFilterBtn = Instance.new("TextButton")
+                    FavFilterBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    FavFilterBtn.Position = UDim2.new(0.666, 0, 0, 0)
+                    FavFilterBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    FavFilterBtn.BorderSizePixel = 0
+                    FavFilterBtn.Text = "★ Fav"
+                    FavFilterBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    FavFilterBtn.TextSize = 10
+                    FavFilterBtn.Font = Enum.Font.GothamBold
+                    FavFilterBtn.Parent = SubActionBar
+                    Instance.new("UICorner", FavFilterBtn).CornerRadius = UDim.new(0, 4)
+
+                    local SearchBox = Instance.new("TextBox")
+                    SearchBox.Size = UDim2.new(1, -16, 0, 26)
+                    SearchBox.Position = UDim2.new(0, 8, 0, 64)
+                    SearchBox.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+                    SearchBox.BorderSizePixel = 0
+                    SearchBox.PlaceholderText = " Buscar cosmetic..."
+                    SearchBox.Text = ""
+                    SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    SearchBox.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
+                    SearchBox.TextSize = 10
+                    SearchBox.Font = Enum.Font.Gotham
+                    SearchBox.Parent = CosmeticSection
+                    Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 4)
+                    local CSearchStroke = Instance.new("UIStroke")
+                    CSearchStroke.Color = Color3.fromRGB(30, 30, 30)
+                    CSearchStroke.Thickness = 1
+                    CSearchStroke.Parent = SearchBox
+
+                    local ListFrame = Instance.new("ScrollingFrame")
+                    ListFrame.Size = UDim2.new(1, -16, 1, -96)
+                    ListFrame.Position = UDim2.new(0, 8, 0, 94)
+                    ListFrame.BackgroundTransparency = 1
+                    ListFrame.BorderSizePixel = 0
+                    ListFrame.ScrollBarThickness = 3
+                    ListFrame.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+                    ListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+                    ListFrame.Parent = CosmeticSection
+
+                    local ListGrid = Instance.new("UIGridLayout")
+                    ListGrid.CellSize = UDim2.new(0, 78, 0, 78)
+                    ListGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+                    ListGrid.SortOrder = Enum.SortOrder.Name
+                    ListGrid.Parent = ListFrame
+
+                    local ListPadding = Instance.new("UIPadding")
+                    ListPadding.PaddingTop = UDim.new(0, 4)
+                    ListPadding.PaddingLeft = UDim.new(0, 4)
+                    ListPadding.PaddingRight = UDim.new(0, 4)
+                    ListPadding.Parent = ListFrame
+
+                    local Notify = Instance.new("TextLabel")
+                    Notify.Size = UDim2.new(0, 220, 0, 28)
+                    Notify.Position = UDim2.new(0.5, -110, 1, -34)
+                    Notify.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                    Notify.BorderSizePixel = 0
+                    Notify.Text = ""
+                    Notify.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    Notify.TextSize = 10
+                    Notify.Font = Enum.Font.GothamBold
+                    Notify.Visible = false
+                    Notify.Parent = MainFrameUI
+                    Instance.new("UICorner", Notify).CornerRadius = UDim.new(0, 4)
+                    local NotifyStroke = Instance.new("UIStroke")
+                    NotifyStroke.Color = Color3.fromRGB(50, 50, 50)
+                    NotifyStroke.Thickness = 1
+                    NotifyStroke.Parent = Notify
+
+                    showNotify = function(text)
+                        Notify.Text = text
+                        Notify.Visible = true
+                        task.delay(2, function()
+                            Notify.Visible = false
+                        end)
+                    end
+
+                    local function refreshCosmeticList(filter)
+                        for _, child in ipairs(ListFrame:GetChildren()) do
+                            if child:IsA("TextButton") then
+                                child:Destroy()
+                            end
+                        end
+                        
+                        local count = 0
+                        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local typeMatch = false
+                                local t = tostring(cosmetic.Type or ""):lower()
+                                local n = name:lower()
+                                
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then typeMatch = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then typeMatch = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then typeMatch = true end
+                                
+                                if typeMatch and (not filter or filter == "" or n:find(filter:lower())) then
+                                    if not (showOnlyFavorites and not favorites[name]) then
+                                        count += 1
+                                        local btn = Instance.new("TextButton")
+                                        btn.Size = UDim2.new(0, 78, 0, 78)
+                                        btn.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+                                        btn.BorderSizePixel = 0
+                                        btn.Text = ""
+                                        btn.AutoButtonColor = false
+                                        btn.Parent = ListFrame
+                                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                                        local btnStroke = Instance.new("UIStroke")
+                                        btnStroke.Color = Color3.fromRGB(25, 25, 25)
+                                        btnStroke.Thickness = 1
+                                        btnStroke.Parent = btn
+                                        
+                                        local imgId = getAssetImage(name, false)
+                                        local icon = Instance.new("ImageLabel")
+                                        icon.Size = UDim2.new(1, -10, 1, -10)
+                                        icon.Position = UDim2.new(0, 5, 0, 5)
+                                        icon.BackgroundTransparency = 1
+                                        icon.Image = imgId
+                                        icon.ScaleType = Enum.ScaleType.Fit
+                                        icon.Parent = btn
+                                        
+                                        local nameLabel = Instance.new("TextLabel")
+                                        nameLabel.Size = UDim2.new(1, -4, 0, 12)
+                                        nameLabel.Position = UDim2.new(0, 2, 1, -14)
+                                        nameLabel.BackgroundTransparency = 1
+                                        nameLabel.Text = name
+                                        nameLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
+                                        nameLabel.TextSize = 8
+                                        nameLabel.Font = Enum.Font.GothamBold
+                                        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                                        nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+                                        nameLabel.Parent = btn
+                                        
+                                        local star = Instance.new("TextButton")
+                                        star.Size = UDim2.new(0, 18, 0, 18)
+                                        star.Position = UDim2.new(1, -20, 0, 2)
+                                        star.BackgroundTransparency = 1
+                                        star.Text = (favorites[name] and "★") or "☆"
+                                        star.TextColor3 = (favorites[name] and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(100, 100, 100)
+                                        star.TextSize = 12
+                                        star.Font = Enum.Font.GothamBold
+                                        star.Parent = btn
+                                        
+                                        star.MouseButton1Click:Connect(function()
+                                            favorites[name] = not favorites[name]
+                                            if not favorites[name] then
+                                                favorites[name] = nil
+                                            end
+                                            star.Text = (favorites[name] and "★") or "☆"
+                                            star.TextColor3 = (favorites[name] and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(100, 100, 100)
+                                            saveConfig()
+                                        end)
+                                        
+                                        btn.MouseEnter:Connect(function()
+                                            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+                                            TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(60, 60, 60)}):Play()
+                                        end)
+                                        btn.MouseLeave:Connect(function()
+                                            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                            TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(25, 25, 25)}):Play()
+                                        end)
+                                        btn.MouseButton1Click:Connect(function()
+                                            equipCosmetic(name, currentCategory)
+                                            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(0, 120, 60)}):Play()
+                                            task.wait(0.35)
+                                            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                        local rows = math.ceil(count / 8)
+                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, (rows * 86) + 8)
+                    end
+
+                    local function refreshWeaponList(filter)
+                        for _, child in ipairs(WeaponList:GetChildren()) do
+                            if child:IsA("TextButton") then
+                                child:Destroy()
+                            end
+                        end
+                        
+                        local weapons = WEAPON_CATEGORIES[currentWeaponTab] or {}
+                        local count = 0
+                        for _, weaponName in ipairs(weapons) do
+                            if not filter or filter == "" or weaponName:lower():find(filter:lower()) then
+                                count += 1
+                                
+                                local btn = Instance.new("TextButton")
+                                btn.Size = UDim2.new(0, 78, 0, 78)
+                                btn.BackgroundColor3 = (selectedWeapon == weaponName and Color3.fromRGB(25, 35, 45)) or Color3.fromRGB(12, 12, 12)
+                                btn.BorderSizePixel = 0
+                                btn.Text = ""
+                                btn.AutoButtonColor = false
+                                btn.Parent = WeaponList
+                                Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                                local btnStroke = Instance.new("UIStroke")
+                                btnStroke.Color = (selectedWeapon == weaponName and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(25, 25, 25)
+                                btnStroke.Thickness = 1
+                                btnStroke.Parent = btn
+                                
+                                local imgId = getAssetImage(weaponName, true)
+                                local icon = Instance.new("ImageLabel")
+                                icon.Size = UDim2.new(1, -10, 1, -10)
+                                icon.Position = UDim2.new(0, 5, 0, 5)
+                                icon.BackgroundTransparency = 1
+                                icon.Image = imgId
+                                icon.ScaleType = Enum.ScaleType.Fit
+                                icon.Parent = btn
+                                
+                                local nameLabel = Instance.new("TextLabel")
+                                nameLabel.Size = UDim2.new(1, -4, 0, 12)
+                                nameLabel.Position = UDim2.new(0, 2, 1, -14)
+                                nameLabel.BackgroundTransparency = 1
+                                nameLabel.Text = weaponName
+                                nameLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
+                                nameLabel.TextSize = 8
+                                nameLabel.Font = Enum.Font.GothamBold
+                                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                                nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+                                nameLabel.Parent = btn
+                                
+                                btn.MouseEnter:Connect(function()
+                                    if selectedWeapon ~= weaponName then
+                                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+                                        TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(60, 60, 60)}):Play()
+                                    end
+                                end)
+                                btn.MouseLeave:Connect(function()
+                                    if selectedWeapon ~= weaponName then
+                                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                        TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(25, 25, 25)}):Play()
+                                    end
+                                end)
+                                btn.MouseButton1Click:Connect(function()
+                                    selectedWeapon = weaponName
+                                    refreshWeaponList(WeaponSearch.Text)
+                                    refreshCosmeticList(SearchBox.Text)
+                                end)
+                            end
+                        end
+                        local rows = math.ceil(count / 8)
+                        WeaponList.CanvasSize = UDim2.new(0, 0, 0, (rows * 86) + 8)
+                    end
+
+                    for tabName, btn in pairs(tabButtons) do
+                        btn.MouseButton1Click:Connect(function()
+                            currentWeaponTab = tabName
+                            for name, b in pairs(tabButtons) do
+                                b.TextColor3 = (name == tabName and Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(170, 170, 170)
+                                b.BackgroundColor3 = (name == tabName and Color3.fromRGB(25, 25, 25)) or Color3.fromRGB(15, 15, 15)
+                            end
+                            refreshWeaponList(WeaponSearch.Text)
+                        end)
+                    end
+
+                    tabButtons["Primary"].TextColor3 = Color3.fromRGB(255, 255, 255)
+                    tabButtons["Primary"].BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+                    for cat, btn in pairs(categoryButtons) do
+                        btn.MouseButton1Click:Connect(function()
+                            currentCategory = cat
+                            for c, b in pairs(categoryButtons) do
+                                b.TextColor3 = (c == cat and Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(170, 170, 170)
+                                b.BackgroundColor3 = (c == cat and Color3.fromRGB(25, 25, 25)) or Color3.fromRGB(15, 15, 15)
+                            end
+                            refreshCosmeticList(SearchBox.Text)
+                        end)
+                    end
+
+                    categoryButtons["Skin"].TextColor3 = Color3.fromRGB(255, 255, 255)
+                    categoryButtons["Skin"].BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+                    RandomBtn.MouseButton1Click:Connect(randomSkin)
+                    UnequipBtn.MouseButton1Click:Connect(unequipCurrent)
+
+                    FavFilterBtn.MouseButton1Click:Connect(function()
+                        showOnlyFavorites = not showOnlyFavorites
+                        FavFilterBtn.TextColor3 = (showOnlyFavorites and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(170, 170, 170)
+                        refreshCosmeticList(SearchBox.Text)
+                    end)
+
+                    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+                        refreshCosmeticList(SearchBox.Text)
+                    end)
+
+                    WeaponSearch:GetPropertyChangedSignal("Text"):Connect(function()
+                        refreshWeaponList(WeaponSearch.Text)
+                    end)
+
+                    MinimizeBtn.MouseButton1Click:Connect(function()
+                        MainFrameUI.Visible = false
+                    end)
+
+                    local dragging = false
+                    local dragStart, startPos
+
+                    TitleBar.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            dragging = true
+                            dragStart = input.Position
+                            startPos = MainFrameUI.Position
+                            input.Changed:Connect(function()
+                                if input.UserInputState == Enum.UserInputState.End then
+                                    dragging = false
+                                end
+                            end)
+                        end
+                    end)
+
+                    UserInputService.InputChanged:Connect(function(input)
+                        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                            local delta = input.Position - dragStart
+                            MainFrameUI.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                        end
+                    end)
+
+                    loadConfig()
+                    local defaultWeapons = WEAPON_CATEGORIES["Primary"]
+                    if defaultWeapons and #defaultWeapons > 0 then
+                        selectedWeapon = defaultWeapons[1]
+                    end
+                    refreshWeaponList("")
+                    refreshCosmeticList("")
+                end)
+            elseif cosmeticInstance then
+                cosmeticInstance.Enabled = true
+            end
+            Library:Notify("Cosmetic Changer activado", 3)
+        else
+            if cosmeticInstance then
+                cosmeticInstance.Enabled = false
+            end
+            Library:Notify("Cosmetic Changer desactivado", 3)
+        end
+    end
+})
+
 local WorldGroup = Tabs["Visuals"]:AddRightGroupbox("World")
 
 WorldGroup:AddToggle("WorldBloom", {
@@ -892,25 +1777,46 @@ MiscLeft:AddSlider("MiscFOV", {
     end
 })
 
--- SECCIÓN ANTI-AIM BROKEN (HRP CONGELADO / EXTREMIDADES ROTAS)
-local MiscRight = Tabs["Misc"]:AddRightGroupbox("Anti-Aim & Underground")
+local MiscRight = Tabs["Misc"]:AddRightGroupbox("Anti-Aim Pro & Underground")
 
 MiscRight:AddToggle("AntiAimToggle", {
     Text = "ENABLED ANTI-AIM",
     Default = false,
     Callback = function(Value)
         AntiAimEnabled = Value
-        frozenRootPosition = nil
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum.AutoRotate = not Value
+        end
     end
 })
 
 MiscRight:AddDropdown("AntiAimModeDropdown", {
-    Values = {"Aggressive Spin", "Broken Jitter", "Psychotic", "Inverted"},
+    Values = {"Spin", "Jitter", "Random 360", "Backward", "Sideways", "Zero"},
     Default = 1,
     Multi = false,
-    Text = "Anti-Aim Mode",
+    Text = "Anti-Aim Yaw Mode",
     Callback = function(Value)
         AntiAimMode = Value
+    end
+})
+
+MiscRight:AddDropdown("AntiAimPitchDropdown", {
+    Values = {"None", "Down (Hide Head)", "Up", "Jitter Pitch", "Random"},
+    Default = 1,
+    Multi = false,
+    Text = "Anti-Aim Pitch (Head)",
+    Callback = function(Value)
+        AntiAimPitch = Value
+    end
+})
+
+MiscRight:AddToggle("AntiAimDesyncFlick", {
+    Text = "Desync Micro-Flick",
+    Default = false,
+    Callback = function(Value)
+        AntiAimDesyncFlick = Value
     end
 })
 
@@ -918,7 +1824,7 @@ MiscRight:AddSlider("AntiAimSpeedSlider", {
     Text = "Anti-Aim Speed",
     Default = 1000,
     Min = 100,
-    Max = 3000,
+    Max = 5000,
     Rounding = 0,
     Callback = function(Value)
         AntiAimSpeed = Value
@@ -926,13 +1832,24 @@ MiscRight:AddSlider("AntiAimSpeedSlider", {
 })
 
 MiscRight:AddSlider("AntiAimIntensitySlider", {
-    Text = "Anti-Aim Intensity",
+    Text = "Anti-Aim Jitter Angle",
     Default = 10,
     Min = 1,
     Max = 20,
     Rounding = 1,
     Callback = function(Value)
         AntiAimIntensity = Value
+    end
+})
+
+MiscRight:AddSlider("CameraShakeSlider", {
+    Text = "Camera Shake (Visual)",
+    Default = 0,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        CameraShakeIntensity = Value
     end
 })
 
@@ -1073,6 +1990,11 @@ MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
 })
 
 MenuGroup:AddButton("Unload", function()
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.AutoRotate = true
+    end
     Library:Unload()
 end)
 
@@ -1424,7 +2346,6 @@ RunService.Heartbeat:Connect(function()
     end
 end)
 
--- Underground Manipulation
 RunService.Stepped:Connect(function()
     if not isRagebotOn or not UndergroundManipulationEnabled then 
         undergroundAnchorPos = nil
@@ -1459,7 +2380,6 @@ RunService.Stepped:Connect(function()
     hrp.AssemblyAngularVelocity = Vector3.zero
 end)
 
--- INTEGRACIÓN DE UNDERGROUND SOLICITADO
 RunService.Stepped:Connect(function()
     if not MiscUndergroundEnabled then return end
     local char = LocalPlayer.Character
@@ -1478,8 +2398,7 @@ RunService.Stepped:Connect(function()
     hrp.AssemblyAngularVelocity = Vector3.zero
 end)
 
--- RENDERSTEPPED: ANTI-AIM BROKEN (HRP ABSOLUTAMENTE CONGELADO / TODO LO DEMÁS ROTO)
-RunService.RenderStepped:Connect(function()
+RunService.RenderStepped:Connect(function(dt)
     updateESP()
 
     local char = LocalPlayer.Character
@@ -1502,6 +2421,7 @@ RunService.RenderStepped:Connect(function()
             if getgenv().AntiSit then
                 hum.Sit = false
             end
+            hum.AutoRotate = not AntiAimEnabled
         end
 
         if getgenv().Noclip then
@@ -1516,35 +2436,59 @@ RunService.RenderStepped:Connect(function()
             hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinbotSpeed * 0.05), 0)
         end
 
-        -- LÓGICA ANTI-AIM BROKEN (HRP FIJO, EXTREMIDADES Y TORSO ROTOS)
         if AntiAimEnabled and hrp then
-            if not frozenRootPosition then
-                frozenRootPosition = hrp.CFrame
-            end
-            
-            -- Bloquear por completo la posición y velocidad del HumanoidRootPart para que no se mueva NUNCA
-            hrp.CFrame = frozenRootPosition
-            hrp.AssemblyLinearVelocity = Vector3.zero
-            hrp.AssemblyAngularVelocity = Vector3.zero
+            local camLook = Camera.CFrame.LookVector
+            local baseYaw = math.atan2(-camLook.X, -camLook.Z)
+            local yawOffset = 0
+            local pitchOffset = 0
 
-            -- Desincronizar y romper las articulaciones visuales (Motor6D) agresivamente
-            for _, joint in ipairs(char:GetDescendants()) do
-                if joint:IsA("Motor6D") then
-                    local t = tick() * (AntiAimSpeed * 0.01)
-                    if AntiAimMode == "Aggressive Spin" then
-                        joint.C0 = joint.C0 * CFrame.Angles(math.sin(t) * 0.5, math.cos(t) * 0.8, 0)
-                    elseif AntiAimMode == "Broken Jitter" then
-                        local jit = math.rad(math.random(-AntiAimIntensity * 10, AntiAimIntensity * 10))
-                        joint.C0 = joint.C0 * CFrame.Angles(jit, jit, jit)
-                    elseif AntiAimMode == "Psychotic" then
-                        joint.C0 = joint.C0 * CFrame.Angles(math.rad(math.random(-180, 180)), math.rad(math.random(-180, 180)), 0)
-                    elseif AntiAimMode == "Inverted" then
-                        joint.C0 = joint.C0 * CFrame.Angles(math.pi, math.sin(t) * AntiAimIntensity, 0)
-                    end
-                end
+            if AntiAimMode == "Spin" then
+                antiAimAngle = (antiAimAngle + (AntiAimSpeed * dt)) % 360
+                yawOffset = math.rad(antiAimAngle)
+            elseif AntiAimMode == "Jitter" then
+                local side = (math.floor(tick() * (AntiAimSpeed * 0.05)) % 2 == 0) and 1 or -1
+                yawOffset = math.rad(180 + (side * (AntiAimIntensity * 8)))
+            elseif AntiAimMode == "Random 360" then
+                yawOffset = math.rad(math.random(0, 360))
+            elseif AntiAimMode == "Backward" then
+                yawOffset = math.rad(180)
+            elseif AntiAimMode == "Sideways" then
+                local side = (math.floor(tick() * 20) % 2 == 0) and 90 or -90
+                yawOffset = math.rad(side)
+            elseif AntiAimMode == "Zero" then
+                baseYaw = 0
+                yawOffset = 0
             end
-        else
-            frozenRootPosition = nil
+
+            if AntiAimPitch == "Down (Hide Head)" then
+                pitchOffset = math.rad(-89)
+            elseif AntiAimPitch == "Up" then
+                pitchOffset = math.rad(89)
+            elseif AntiAimPitch == "Jitter Pitch" then
+                pitchOffset = math.rad((math.floor(tick() * 30) % 2 == 0) and -89 or 89)
+            elseif AntiAimPitch == "Random" then
+                pitchOffset = math.rad(math.random(-89, 89))
+            end
+
+            local finalPos = hrp.Position
+            if AntiAimDesyncFlick and (tick() - lastFlickTime > 0.06) then
+                lastFlickTime = tick()
+                local flickOffset = Vector3.new(
+                    (math.random() - 0.5) * 2.5,
+                    0,
+                    (math.random() - 0.5) * 2.5
+                )
+                finalPos = finalPos + flickOffset
+            end
+
+            hrp.CFrame = CFrame.new(finalPos) * CFrame.Angles(0, baseYaw + yawOffset, 0) * CFrame.Angles(pitchOffset, 0, 0)
+            hrp.AssemblyAngularVelocity = Vector3.zero
+        end
+
+        if CameraShakeIntensity > 0 then
+            local shakeX = (math.random() - 0.5) * CameraShakeIntensity * 0.2
+            local shakeY = (math.random() - 0.5) * CameraShakeIntensity * 0.2
+            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(shakeX), math.rad(shakeY), 0)
         end
     end
 end)
@@ -1560,13 +2504,13 @@ end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
     undergroundAnchorPos = nil
-    frozenRootPosition = nil
     task.wait(0.5)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
         hum.WalkSpeed = MiscSpeedBoost
         hum.JumpPower = MiscJumpPower
         hum.HipHeight = MiscHipHeight
+        hum.AutoRotate = not AntiAimEnabled
     end
 end)
 
@@ -1594,7 +2538,6 @@ spawn(function()
     end
 end)
 
--- UE COUNTER PURO
 RunService.RenderStepped:Connect(function()
     if not isUEKillersOn then return end
     
@@ -1693,7 +2636,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- KICIA COUNTER PURO
 RunService.RenderStepped:Connect(function()
     if not isAxeCounterOn then 
         lockedYPosition = nil
@@ -1794,7 +2736,6 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- AUTO FIRE INDEPENDIENTE
 runS.Heartbeat:Connect(function()
     if not getgenv().Config.Enabled then return end
     if isInVoidPhase then return end
@@ -1843,7 +2784,6 @@ runS.Heartbeat:Connect(function()
     end)
 end)
 
--- RAGEBOT DIRECTO Y SÚPER AGRESIVO
 task.spawn(function()
     local lastTarget = nil
     local lastTargetPos = nil
