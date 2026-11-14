@@ -1,4 +1,4 @@
-Local RIVALS_GAME_ID = 6035872082
+local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
     warn("[shako.win] " .. msg .. " | GameId=" .. tostring(game.GameId))
@@ -62,6 +62,8 @@ local isRagebotOn = false
 local isManipulacionOn = false
 local isInVoidPhase = false
 local VoidPhaseEnabled = false
+local lockedYPosition = nil
+local initialPosition = nil
 
 local rageOffsetX = 0
 local rageOffsetY = 0
@@ -75,8 +77,11 @@ local randomWords = {"APOCALYPSE", "DESTROYING", "ANNIHILATING", "GODMODE", "RAG
 
 local AutoPrioritized = true
 local PriorityMode = "Closest"
+local lastPrioritizedPlayer = nil
+local lastNotifyTime = 0
 local playerVelocityHistory = {}
 
+local ResolverEnabled = false
 local KillDelay = 0
 local AntiCounterEnabled = false
 local UndergroundHeight = 5.6
@@ -96,6 +101,9 @@ local ueGodmode = true
 local ueAutoEquip = true
 local ueShoot = true
 
+local MiscUndergroundEnabled = false
+
+-- ESP Configs & Colors
 local ESPEnabled = false
 local ESPBox = false
 local ESPBoxColor = Color3.fromRGB(0, 255, 128)
@@ -120,10 +128,12 @@ local ESPHeadDotColor = Color3.fromRGB(255, 0, 0)
 local ESPOffscreenArrows = false
 local ESPArrowColor = Color3.fromRGB(0, 255, 128)
 
+-- Weapon Chams (Local Client / Viewmodel)
 local WeaponChamsEnabled = false
 local WeaponChamsMaterial = "Neon"
 local WeaponChamsColor = Color3.fromRGB(0, 255, 255)
 
+-- Viewmodel Customizer Configs (Local Client)
 local ViewmodelCustomizerEnabled = false
 local VM_X = 0
 local VM_Y = 0
@@ -134,12 +144,12 @@ local VM_RotZ = 0
 
 local ESPTeamCheck = true
 
+-- Watermark Configs
 local WatermarkEnabled = false
 local WatermarkFPS = true
 local WatermarkPing = true
 local WatermarkName = true
 local WatermarkTime = true
-local WatermarkStatus = true
 local WatermarkColor = Color3.fromRGB(0, 255, 128)
 
 local Drawings = {}
@@ -147,6 +157,8 @@ local Highlights = {}
 
 local MiscSpeedBoost = 50
 local MiscJumpPower = 50
+local SpinbotEnabled = false
+local SpinbotSpeed = 500
 
 local RageGui = Instance.new("ScreenGui")
 RageGui.Name = "RagebotStatusGui"
@@ -168,6 +180,7 @@ StatusLabel.Font = Enum.Font.Code
 StatusLabel.Text = "VOID"
 StatusLabel.Parent = RageGui
 
+-- Watermark UI Setup
 local WatermarkLabel = Instance.new("TextLabel")
 WatermarkLabel.Name = "WatermarkLabel"
 WatermarkLabel.Size = UDim2.new(0, 300, 0, 30)
@@ -390,6 +403,7 @@ RageGroup:AddToggle("ResolverToggle", {
     Text = "Resolver",
     Default = false,
     Callback = function(Value)
+        ResolverEnabled = Value
     end
 })
 
@@ -734,7 +748,6 @@ ViewmodelGroup:AddSlider("VM_RotZ", {
 local CosmeticsGroup = Tabs["Visuals"]:AddRightGroupbox("Cosmetics")
 
 local cosmeticInstance = nil
-local globalEquippedSkins = {}
 
 CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
     Text = "Show Cosmetic Changer",
@@ -760,7 +773,7 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                     local ItemLibrary = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10))
                     local DataController = require(controllers:WaitForChild("PlayerDataController", 10))
 
-                    local equipped = globalEquippedSkins
+                    local equipped = {}
                     local favorites = {}
                     local currentCategory = "Skin"
                     local selectedWeapon = nil
@@ -1609,17 +1622,17 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
     end
 })
 
-local WorldGroup = Tabs["Visuals"]:AddRightGroupbox("World Customization (Full)")
+local WorldGroup = Tabs["Visuals"]:AddRightGroupbox("World")
 
 WorldGroup:AddToggle("WorldBloom", {
-    Text = "Advanced Bloom",
+    Text = "Bloom",
     Default = false,
     Callback = function(Value)
         if Value then
             local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
-            bloom.Intensity = 1.2
-            bloom.Size = 32
-            bloom.Threshold = 0.8
+            bloom.Intensity = 0.8
+            bloom.Size = 24
+            bloom.Threshold = 0.9
             bloom.Parent = Lighting
         else
             local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
@@ -1629,17 +1642,17 @@ WorldGroup:AddToggle("WorldBloom", {
 })
 
 WorldGroup:AddToggle("WorldAtmosphere", {
-    Text = "Custom Atmosphere & Tint",
+    Text = "Atmosphere",
     Default = false,
     Callback = function(Value)
         if Value then
             local atm = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
-            atm.Density = 0.35
+            atm.Density = 0.3
             atm.Offset = 0.25
-            atm.Color = Color3.fromRGB(0, 120, 255)
-            atm.Decay = Color3.fromRGB(15, 15, 30)
-            atm.Glare = 0.4
-            atm.Haze = 2
+            atm.Color = Color3.fromRGB(100, 150, 200)
+            atm.Decay = Color3.fromRGB(50, 50, 80)
+            atm.Glare = 0.2
+            atm.Haze = 1.5
             atm.Parent = Lighting
         else
             local atm = Lighting:FindFirstChildOfClass("Atmosphere")
@@ -1649,15 +1662,15 @@ WorldGroup:AddToggle("WorldAtmosphere", {
 })
 
 WorldGroup:AddToggle("WorldColorCorrection", {
-    Text = "Cyberpunk Color Correction",
+    Text = "Color Correction",
     Default = false,
     Callback = function(Value)
         if Value then
             local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect")
-            cc.Brightness = 0.1
-            cc.Contrast = 0.25
-            cc.Saturation = 0.4
-            cc.TintColor = Color3.fromRGB(220, 240, 255)
+            cc.Brightness = 0.05
+            cc.Contrast = 0.15
+            cc.Saturation = 0.2
+            cc.TintColor = Color3.fromRGB(255, 240, 230)
             cc.Parent = Lighting
         else
             local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
@@ -1672,8 +1685,8 @@ WorldGroup:AddToggle("WorldSunRays", {
     Callback = function(Value)
         if Value then
             local sr = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
-            sr.Intensity = 0.25
-            sr.Spread = 0.8
+            sr.Intensity = 0.15
+            sr.Spread = 0.6
             sr.Parent = Lighting
         else
             local sr = Lighting:FindFirstChildOfClass("SunRaysEffect")
@@ -1688,10 +1701,10 @@ WorldGroup:AddToggle("WorldDepthOfField", {
     Callback = function(Value)
         if Value then
             local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect") or Instance.new("DepthOfFieldEffect")
-            dof.FarIntensity = 0.4
-            dof.FocusDistance = 40
-            dof.InFocusRadius = 25
-            dof.NearIntensity = 0.3
+            dof.FarIntensity = 0.3
+            dof.FocusDistance = 50
+            dof.InFocusRadius = 30
+            dof.NearIntensity = 0.2
             dof.Parent = Lighting
         else
             local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect")
@@ -1701,12 +1714,12 @@ WorldGroup:AddToggle("WorldDepthOfField", {
 })
 
 WorldGroup:AddToggle("WorldBlur", {
-    Text = "Ambient Blur",
+    Text = "Blur",
     Default = false,
     Callback = function(Value)
         if Value then
             local blur = Lighting:FindFirstChildOfClass("BlurEffect") or Instance.new("BlurEffect")
-            blur.Size = 6
+            blur.Size = 8
             blur.Parent = Lighting
         else
             local blur = Lighting:FindFirstChildOfClass("BlurEffect")
@@ -1727,8 +1740,8 @@ WorldGroup:AddSlider("WorldBrightness", {
 })
 
 WorldGroup:AddSlider("WorldClockTime", {
-    Text = "Clock Time (Night/Day)",
-    Default = 0,
+    Text = "Clock Time",
+    Default = 14,
     Min = 0,
     Max = 24,
     Rounding = 1,
@@ -1761,7 +1774,7 @@ WorldGroup:AddSlider("WorldFogEnd", {
 
 WorldGroup:AddSlider("WorldExposure", {
     Text = "Exposure Compensation",
-    Default = 0.2,
+    Default = 0,
     Min = -5,
     Max = 5,
     Rounding = 1,
@@ -1778,7 +1791,7 @@ WorldGroup:AddToggle("WorldGlobalShadows", {
     end
 })
 
-local MiscLeft = Tabs["Misc"]:AddLeftGroupbox("Player Movement")
+local MiscLeft = Tabs["Misc"]:AddLeftGroupbox("Player")
 
 MiscLeft:AddToggle("MiscInfiniteJump", {
     Text = "Infinite Jump",
@@ -1801,6 +1814,65 @@ MiscLeft:AddToggle("MiscAntiAFK", {
     Default = true,
     Callback = function(Value)
         getgenv().AntiAFK = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscGodMode", {
+    Text = "Client Godmode",
+    Default = false,
+    Callback = function(Value)
+        getgenv().GodMode = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAutoRespawn", {
+    Text = "Auto Respawn",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoRespawn = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAntiSit", {
+    Text = "Anti Sit",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AntiSit = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAntiRagdoll", {
+    Text = "Anti Ragdoll",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AntiRagdoll = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscNoFallDamage", {
+    Text = "No Fall Damage",
+    Default = false,
+    Callback = function(Value)
+        getgenv().NoFallDamage = Value
+    end
+})
+
+MiscLeft:AddToggle("SpinbotEnabled", {
+    Text = "Spinbot",
+    Default = false,
+    Callback = function(Value)
+        SpinbotEnabled = Value
+    end
+})
+
+MiscLeft:AddSlider("SpinbotSpeed", {
+    Text = "Spinbot Speed",
+    Default = 500,
+    Min = 50,
+    Max = 50000,
+    Rounding = 0,
+    Callback = function(Value)
+        SpinbotSpeed = Value
     end
 })
 
@@ -1834,7 +1906,7 @@ MiscLeft:AddSlider("MiscJumpPower", {
     end
 })
 
-local WatermarkRight = Tabs["Misc"]:AddRightGroupbox("Watermark Customizer")
+local WatermarkRight = Tabs["Misc"]:AddRightGroupbox("Watermark")
 
 WatermarkRight:AddToggle("WatermarkEnabledToggle", {
     Text = "ENABLED",
@@ -1883,35 +1955,9 @@ WatermarkRight:AddToggle("WmShowTime", {
     end
 })
 
-WatermarkRight:AddToggle("WmShowStatus", {
-    Text = "Show Script Tag",
-    Default = true,
-    Callback = function(Value)
-        WatermarkStatus = Value
-    end
-})
-
-local RemsGroup = Tabs["UI Settings"]:AddRightGroupbox("REM'S CONFIGS + AUTO SKINS")
+local RemsGroup = Tabs["UI Settings"]:AddRightGroupbox("REM'S CONFIGS")
 
 local SelectedRemConfig = "Rage Full - Destroyer"
-
-local function applyPresetSkins()
-    pcall(function()
-        Toggles.ShowCosmeticChanger:SetValue(true)
-        task.wait(0.3)
-        local CosmeticLibrary = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10))
-        if CosmeticLibrary and CosmeticLibrary.Cosmetics then
-            for name, data in pairs(CosmeticLibrary.Cosmetics) do
-                if tostring(data.Type or ""):lower() == "skin" then
-                    globalEquippedSkins["Assault Rifle"] = { Skin = { Name = name, Seed = 1337 } }
-                    globalEquippedSkins["Revolver"] = { Skin = { Name = name, Seed = 1337 } }
-                    globalEquippedSkins["Battle Axe"] = { Skin = { Name = name, Seed = 1337 } }
-                    break
-                end
-            end
-        end
-    end)
-end
 
 local RemsPresets = {
     ["Rage Full - Destroyer"] = function()
@@ -1927,7 +1973,6 @@ local RemsPresets = {
         Toggles.ESPBox:SetValue(true)
         Toggles.ESPChams:SetValue(true)
         Toggles.ESPHealth:SetValue(true)
-        applyPresetSkins()
     end,
 
     ["Rage Full - Counter God"] = function()
@@ -1945,7 +1990,6 @@ local RemsPresets = {
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPTracer:SetValue(true)
         Toggles.ESPChams:SetValue(true)
-        applyPresetSkins()
     end,
 
     ["Legit - Closet Visuals"] = function()
@@ -1954,6 +1998,7 @@ local RemsPresets = {
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.UEKillersToggle:SetValue(false)
         Toggles.AxeCounterToggle:SetValue(false)
+        Toggles.SpinbotEnabled:SetValue(false)
         Options.MiscSpeedBoost:SetValue(50)
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPBox:SetValue(true)
@@ -1962,7 +2007,6 @@ local RemsPresets = {
         Toggles.ESPHealth:SetValue(true)
         Toggles.ESPChams:SetValue(false)
         Toggles.ESPTracer:SetValue(false)
-        applyPresetSkins()
     end,
 
     ["Legit - Pro Movement"] = function()
@@ -1973,12 +2017,12 @@ local RemsPresets = {
         Toggles.AxeCounterToggle:SetValue(false)
         Options.MiscSpeedBoost:SetValue(62)
         Toggles.MiscInfiniteJump:SetValue(false)
+        Toggles.MiscNoFallDamage:SetValue(true)
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPChams:SetValue(true)
         Toggles.ESPHeadDot:SetValue(true)
         Toggles.ESPOffscreenArrows:SetValue(true)
         Toggles.ESPBox:SetValue(false)
-        applyPresetSkins()
     end
 }
 
@@ -1997,11 +2041,11 @@ RemsGroup:AddDropdown("RemsConfigDropdown", {
     end
 })
 
-RemsGroup:AddButton("Load Selected Config + Skins", function()
+RemsGroup:AddButton("Load Selected Config", function()
     local presetFunc = RemsPresets[SelectedRemConfig]
     if presetFunc then
         pcall(presetFunc)
-        Library:Notify("REM'S CONFIG + SKINS cargado: " .. SelectedRemConfig, 4)
+        Library:Notify("REM'S CONFIG cargado: " .. SelectedRemConfig, 4)
     end
 end)
 
@@ -2158,6 +2202,32 @@ local function getClosestTarget(maxDistance)
     return bestPlayer, bestRoot, bestHead
 end
 
+local function bringAllToMe()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local targetCFrame = rootPart.CFrame
+
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local enemyChar = player.Character
+            if enemyChar then
+                local enemyRoot = enemyChar:FindFirstChild("HumanoidRootPart")
+                if enemyRoot then
+                    for _, part in ipairs(enemyChar:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                    enemyRoot.CFrame = targetCFrame
+                end
+            end
+        end
+    end
+end
+
 local function createDrawing(class, props)
     local d = Drawing.new(class)
     for k, v in pairs(props or {}) do
@@ -2179,8 +2249,10 @@ local function removeDrawings(player)
     end
 end
 
+-- Weapon Chams aplicado EXCLUSIVAMENTE al arma del cliente (LocalPlayer)
 local function updateWeaponChams()
     if not WeaponChamsEnabled then return end
+    
     pcall(function()
         if FighterController and FighterController.LocalFighter then
             local item = FighterController.LocalFighter.EquippedItem
@@ -2200,6 +2272,7 @@ local function updateWeaponChams()
     end)
 end
 
+-- Viewmodel Customizer aplicado EXCLUSIVAMENTE al cliente
 local function updateViewmodel()
     if not ViewmodelCustomizerEnabled then return end
     pcall(function()
@@ -2263,6 +2336,7 @@ local function updateESP()
         local scale = (size.Y * Camera.ViewportSize.Y) / (dist * 2) * 0.4
         local boxW, boxH = scale * 0.6, scale
 
+        -- Update Colors dynamically
         d.Box.Color = ESPBoxColor
         d.Name.Color = ESPNameColor
         d.Distance.Color = ESPDistanceColor
@@ -2378,6 +2452,7 @@ local function updateESP()
     end
 end
 
+-- Watermark & General Loops
 RunService.RenderStepped:Connect(function()
     updateESP()
     updateWeaponChams()
@@ -2385,9 +2460,6 @@ RunService.RenderStepped:Connect(function()
 
     if WatermarkEnabled then
         local parts = {}
-        if WatermarkStatus then
-            table.insert(parts, "AXE COUNTER GG V2")
-        end
         if WatermarkFPS then
             local fps = math.floor(1 / RunService.RenderStepped:Wait())
             table.insert(parts, fps .. " FPS")
@@ -2416,9 +2488,16 @@ RunService.RenderStepped:Connect(function()
         local hrp = char:FindFirstChild("HumanoidRootPart")
 
         if hum then
+            if getgenv().GodMode then
+                hum.MaxHealth = math.huge
+                hum.Health = math.huge
+            end
             hum.WalkSpeed = MiscSpeedBoost
             if MiscJumpPower ~= 50 then
                 hum.JumpPower = MiscJumpPower
+            end
+            if getgenv().AntiSit then
+                hum.Sit = false
             end
         end
 
@@ -2428,6 +2507,10 @@ RunService.RenderStepped:Connect(function()
                     part.CanCollide = false
                 end
             end
+        end
+
+        if SpinbotEnabled and hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinbotSpeed * 0.05), 0)
         end
     end
 end)
@@ -2458,6 +2541,18 @@ spawn(function()
                 vu:CaptureController()
                 vu:ClickButton2(Vector2.new())
             end)
+        end
+    end
+end)
+
+spawn(function()
+    while task.wait(1) do
+        if getgenv().AutoRespawn then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health <= 0 then
+                task.wait(0.3)
+                LocalPlayer:LoadCharacter()
+            end
         end
     end
 end)
@@ -2560,6 +2655,8 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if not isAxeCounterOn then 
+        lockedYPosition = nil
+        initialPosition = nil
         return 
     end
 
@@ -2587,12 +2684,14 @@ RunService.RenderStepped:Connect(function()
         end
     end
 
-    local lockedY = humanoidRootPart.Position.Y - UndergroundHeight
-    local initPos = Vector3.new(humanoidRootPart.Position.X, lockedY, humanoidRootPart.Position.Z)
+    if not lockedYPosition or not initialPosition then
+        lockedYPosition = humanoidRootPart.Position.Y - UndergroundHeight
+        initialPosition = Vector3.new(humanoidRootPart.Position.X, lockedYPosition, humanoidRootPart.Position.Z)
+    end
 
     local sideMove = math.sin(tick() * sideSpeed) * sideOffset
     local rightVector = humanoidRootPart.CFrame.RightVector
-    local finalPosition = initPos + (rightVector * sideMove)
+    local finalPosition = initialPosition + (rightVector * sideMove)
 
     angle = (angle + spinSpeed) % 360
     
@@ -2704,6 +2803,7 @@ end)
 
 task.spawn(function()
     local lastTarget = nil
+    local lastTargetPos = nil
 
     while true do
         task.wait()
@@ -2715,6 +2815,7 @@ task.spawn(function()
         if not isRagebotOn then
             StatusLabel.Visible = false
             lastTarget = nil
+            lastTargetPos = nil
             isInVoidPhase = false
             continue
         end
@@ -2788,6 +2889,7 @@ task.spawn(function()
                 StatusLabel.Text = "VOID - No Target"
             end
             lastTarget = nil
+            lastTargetPos = nil
             hrp.AssemblyLinearVelocity = Vector3.zero
             isInVoidPhase = false
             continue
@@ -2803,7 +2905,10 @@ task.spawn(function()
             end
         end
 
+        local predictedPos = targetRoot.Position
         lastTarget = targetPlayer
+        lastTargetPos = targetRoot.Position
+
         isInVoidPhase = false
 
         local prefix = customStatusPrefix
