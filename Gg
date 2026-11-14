@@ -1,9 +1,33 @@
-if game.PlaceId ~= 6035872082 then
-    game:GetService("StarterGui"):SetCore("SendNotification", {
-        Title = "AXE COUNTER GG V2",
-        Text = "Error: Este script es exclusivo para Roblox Rivals.",
-        Duration = 5
-    })
+local RIVALS_PLACE_ID = 6035872082
+
+local function verifyGame()
+    local currentId = game.PlaceId
+    if currentId ~= RIVALS_PLACE_ID then
+        pcall(function()
+            game:GetService("StarterGui"):SetCore("SendNotification", {
+                Title = "AXE COUNTER GG V2",
+                Text = "Error: Este script es exclusivo para Roblox Rivals.",
+                Duration = 5
+            })
+        end)
+        return false
+    end
+    return true
+end
+
+if not verifyGame() then
+    local teleportConnection
+    teleportConnection = game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
+        if state == Enum.TeleportState.Started then
+            task.spawn(function()
+                task.wait(2)
+                if verifyGame() then
+                    teleportConnection:Disconnect()
+                    loadScript()
+                end
+            end)
+        end
+    end)
     return
 end
 
