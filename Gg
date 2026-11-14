@@ -128,16 +128,12 @@ local ESPHeadDotColor = Color3.fromRGB(255, 0, 0)
 local ESPOffscreenArrows = false
 local ESPArrowColor = Color3.fromRGB(0, 255, 128)
 
-local ESPWeapon = false
-local ESPWeaponColor = Color3.fromRGB(0, 200, 255)
-
--- Weapon Chams (ObjectID / Viewmodel Chams)
+-- Weapon Chams (Local Client / Viewmodel)
 local WeaponChamsEnabled = false
 local WeaponChamsMaterial = "Neon"
 local WeaponChamsColor = Color3.fromRGB(0, 255, 255)
-local WeaponChamsTeamCheck = false
 
--- Viewmodel Customizer Configs
+-- Viewmodel Customizer Configs (Local Client)
 local ViewmodelCustomizerEnabled = false
 local VM_X = 0
 local VM_Y = 0
@@ -640,19 +636,6 @@ ESPGroup:AddToggle("ESPOffscreenArrows", {
     end
 })
 
-ESPGroup:AddToggle("ESPWeapon", {
-    Text = "Weapon / Object ESP",
-    Default = false,
-    Callback = function(Value)
-        ESPWeapon = Value
-    end
-}):AddColorPicker("ESPWeaponColorPicker", {
-    Default = ESPWeaponColor,
-    Callback = function(Value)
-        ESPWeaponColor = Value
-    end
-})
-
 ESPGroup:AddToggle("ESPTeamCheck", {
     Text = "Team Check",
     Default = true,
@@ -661,7 +644,7 @@ ESPGroup:AddToggle("ESPTeamCheck", {
     end
 })
 
-local WeaponChamsGroup = Tabs["Visuals"]:AddRightGroupbox("Weapon Chams (ObjectID)")
+local WeaponChamsGroup = Tabs["Visuals"]:AddRightGroupbox("Weapon Chams (Client Viewmodel)")
 
 WeaponChamsGroup:AddToggle("WeaponChamsEnabled", {
     Text = "ENABLED",
@@ -686,15 +669,7 @@ WeaponChamsGroup:AddDropdown("WeaponChamsMaterialDropdown", {
     end
 })
 
-WeaponChamsGroup:AddToggle("WeaponChamsTeamCheck", {
-    Text = "Team Check",
-    Default = false,
-    Callback = function(Value)
-        WeaponChamsTeamCheck = Value
-    end
-})
-
-local ViewmodelGroup = Tabs["Visuals"]:AddRightGroupbox("Viewmodel Customizer")
+local ViewmodelGroup = Tabs["Visuals"]:AddRightGroupbox("Viewmodel Customizer (Client)")
 
 ViewmodelGroup:AddToggle("ViewmodelCustomizerEnabled", {
     Text = "ENABLED",
@@ -2274,19 +2249,17 @@ local function removeDrawings(player)
     end
 end
 
+-- Weapon Chams aplicado EXCLUSIVAMENTE al arma del cliente (LocalPlayer)
 local function updateWeaponChams()
     if not WeaponChamsEnabled then return end
     
     pcall(function()
-        for _, player in ipairs(plrs:GetPlayers()) do
-            if player ~= LocalPlayer then
-                local isAllowed = true
-                if WeaponChamsTeamCheck then
-                    isAllowed = isEnemy(player)
-                end
-                
-                if isAllowed and player.Character then
-                    for _, desc in ipairs(player.Character:GetDescendants()) do
+        if FighterController and FighterController.LocalFighter then
+            local item = FighterController.LocalFighter.EquippedItem
+            if item then
+                local model = item.Model or item.Handle or item.Part
+                if model then
+                    for _, desc in ipairs(model:GetDescendants()) do
                         if desc:IsA("BasePart") then
                             local matEnum = Enum.Material[WeaponChamsMaterial] or Enum.Material.Neon
                             desc.Material = matEnum
@@ -2299,6 +2272,7 @@ local function updateWeaponChams()
     end)
 end
 
+-- Viewmodel Customizer aplicado EXCLUSIVAMENTE al cliente
 local function updateViewmodel()
     if not ViewmodelCustomizerEnabled then return end
     pcall(function()
@@ -2306,7 +2280,6 @@ local function updateViewmodel()
             local item = FighterController.LocalFighter.EquippedItem
             local model = item.Model or item.Handle or item.Part
             if model and model:IsA("BasePart") then
-                -- Aplicar offsets en tiempo real
                 model.CFrame = Camera.CFrame * CFrame.new(VM_X, VM_Y, VM_Z) * CFrame.Angles(math.rad(VM_RotX), math.rad(VM_RotY), math.rad(VM_RotZ))
             end
         end
@@ -2354,7 +2327,6 @@ local function updateESP()
                 Tracer = createDrawing("Line", {Thickness = 1, Visible = false}),
                 HeadDot = createDrawing("Circle", {Thickness = 1, Filled = true, Visible = false, Radius = 4}),
                 Arrow = createDrawing("Triangle", {Thickness = 1, Filled = true, Visible = false}),
-                WeaponText = createDrawing("Text", {Size = 12, Center = true, Outline = true, Visible = false}),
             }
         end
 
@@ -2371,7 +2343,6 @@ local function updateESP()
         d.Tracer.Color = ESPTracerColor
         d.HeadDot.Color = ESPHeadDotColor
         d.Arrow.Color = ESPArrowColor
-        d.WeaponText.Color = ESPWeaponColor
 
         if onScreen then
             if ESPBox then
@@ -2436,23 +2407,6 @@ local function updateESP()
                 d.HeadDot.Visible = false
             end
 
-            if ESPWeapon then
-                local weaponName = "Unknown"
-                pcall(function()
-                    for _, itemChild in ipairs(player.Character:GetChildren()) do
-                        if itemChild:IsA("Model") or itemChild:IsA("Tool") then
-                            weaponName = itemChild.Name
-                            break
-                        end
-                    end
-                end)
-                d.WeaponText.Text = "[" .. tostring(weaponName) .. "]"
-                d.WeaponText.Position = Vector2.new(pos.X, pos.Y + boxH/2 + 16)
-                d.WeaponText.Visible = true
-            else
-                d.WeaponText.Visible = false
-            end
-
             d.Arrow.Visible = false
         else
             d.Box.Visible = false
@@ -2461,7 +2415,6 @@ local function updateESP()
             d.Health.Visible = false
             d.Tracer.Visible = false
             d.HeadDot.Visible = false
-            d.WeaponText.Visible = false
 
             if ESPOffscreenArrows then
                 local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -2832,7 +2785,7 @@ runS.Heartbeat:Connect(function()
 
     local cameradata = {}
     cameradata[utf8.char(1)] = {
-                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+        [utf8.char(0)] = util:EncodeCFrame(aimCF),
         [utf8.char(1)] = util:EncodeCFrame(targetCF),
         [utf8.char(2)] = targetHead,
         [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
