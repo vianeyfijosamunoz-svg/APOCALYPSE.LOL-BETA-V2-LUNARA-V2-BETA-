@@ -1,33 +1,19 @@
-local RIVALS_PLACE_ID = 6035872082
-
-local function verifyGame()
-    local currentId = game.PlaceId
-    if currentId ~= RIVALS_PLACE_ID then
-        pcall(function()
-            game:GetService("StarterGui"):SetCore("SendNotification", {
-                Title = "AXE COUNTER GG V2",
-                Text = "Error: Este script es exclusivo para Roblox Rivals.",
-                Duration = 5
-            })
-        end)
-        return false
-    end
-    return true
+local RIVALS_GAME_ID = 6035872082
+local function notSupportedKick()
+    local msg = "this game not supported"
+    warn("[shako.win] " .. msg .. " | GameId=" .. tostring(game.GameId))
+    pcall(function()
+        local lp = game:GetService("Players").LocalPlayer
+        if lp then lp:Kick(msg) end
+    end)
+    pcall(function()
+        game:GetService("TeleportService"):Teleport(0)
+    end)
+    getgenv().antiSleepy_loaded = false
 end
 
-if not verifyGame() then
-    local teleportConnection
-    teleportConnection = game:GetService("Players").LocalPlayer.OnTeleport:Connect(function(state)
-        if state == Enum.TeleportState.Started then
-            task.spawn(function()
-                task.wait(2)
-                if verifyGame() then
-                    teleportConnection:Disconnect()
-                    loadScript()
-                end
-            end)
-        end
-    end)
+if tonumber(game.GameId) ~= RIVALS_GAME_ID then
+    notSupportedKick()
     return
 end
 
