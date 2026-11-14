@@ -671,42 +671,22 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         return "rbxassetid://6023426915"
                     end
 
-                    local function isValidCosmeticForWeapon(cosmeticName, weaponName, category)
-                        local cosmetic = CosmeticLibrary.Cosmetics[cosmeticName]
-                        if not cosmetic then return false end
-
-                        local t = tostring(cosmetic.Type or ""):lower()
-                        local n = tostring(cosmeticName):lower()
-                        local w = tostring(weaponName):lower()
-
+                    local function isWeaponCosmetic(name, cosmetic)
+                        if not name then return false end
+                        local n = tostring(name):lower()
+                        local t = (cosmetic and tostring(cosmetic.Type or ""):lower()) or ""
                         if t:find("finisher") or t:find("emote") or t:find("dance") or t:find("kill") then
                             return false
                         end
-
-                        if category == "Skin" then
-                            if not (t == "skin" or n:find("skin")) then return false end
-                        elseif category == "Charm" then
-                            if not (t == "charm" or n:find("charm")) then return false end
-                        elseif category == "Wrap" then
-                            if not (t == "wrap" or t == "wrapping" or n:find("wrap")) then return false end
-                        end
-
-                        if cosmetic.Weapon and tostring(cosmetic.Weapon):lower() == w then
+                        if t == "skin" or t == "charm" or t == "wrap" or t == "wrapping" then
                             return true
                         end
-
-                        if n:find(w) then
+                        if n:find("skin") or n:find("charm") or n:find("wrap") then
                             return true
                         end
-
-                        if cosmetic.CompatibleWeapons then
-                            for _, cw in pairs(cosmetic.CompatibleWeapons) do
-                                if tostring(cw):lower() == w then
-                                    return true
-                                end
-                            end
+                        if cosmetic and (cosmetic.Seed or cosmetic.ObjectID or cosmetic.Enum) then
+                            return true
                         end
-
                         return false
                     end
 
@@ -780,10 +760,20 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         if name:find("MISSING_") then
                             return originalOwns(self, inventory, name, weapon)
                         end
-                        if weapon and isValidCosmeticForWeapon(name, weapon, "Skin") then
+                        local cosmetic = CosmeticLibrary.Cosmetics[name]
+                        if isWeaponCosmetic(name, cosmetic) then
                             return true
                         end
                         return originalOwns(self, inventory, name, weapon)
+                    end
+
+                    for _, funcName in pairs({"OwnsCosmeticNormally", "OwnsCosmeticUniversally", "OwnsCosmeticForWeapon"}) do
+                        if CosmeticLibrary[funcName] then
+                            CosmeticLibrary[funcName] = function(_, _, name)
+                                local c = CosmeticLibrary.Cosmetics[name]
+                                return isWeaponCosmetic(name, c)
+                            end
+                        end
                     end
 
                     local originalGet = DataController.Get
@@ -791,12 +781,19 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         local data = originalGet(self, key)
                         if key == "CosmeticInventory" then
                             local proxy = {}
-                            setmetatable(proxy, {
+                            for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                                if isWeaponCosmetic(name, cosmetic) then
+                                    proxy[name] = true
+                                end
+                            end
+                            return setmetatable(proxy, {
                                 __index = function(_, k)
-                                    return true
+                                    local c = CosmeticLibrary.Cosmetics[k]
+                                    if isWeaponCosmetic(k, c) then
+                                        return true
+                                    end
                                 end
                             })
-                            return proxy
                         end
                         return data
                     end
@@ -830,10 +827,6 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
 
                     local function equipCosmetic(name, ctype)
                         if not selectedWeapon then return end
-                        if not isValidCosmeticForWeapon(name, selectedWeapon, ctype) then
-                            showNotify("Skin no válida para esta arma")
-                            return
-                        end
                         equipped[selectedWeapon] = equipped[selectedWeapon] or {}
                         local cloned = cloneCosmetic(name, ctype)
                         if not cloned then return end
@@ -841,6 +834,24 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         forceUpdateWeapon(selectedWeapon)
                         saveConfig()
                         showNotify("✓ " .. name)
+
+                        task.delay(0.5, function()
+                            if equipped[selectedWeapon] and equipped[selectedWeapon][ctype] then
+                                local targetCosmetic = equipped[selectedWeapon][ctype]
+                                if EnumLibrary then
+                                    pcall(function()
+                                        local newEnum = EnumLibrary:ToEnum(targetCosmetic.Name)
+                                        if newEnum then
+                                            targetCosmetic.Enum = newEnum
+                                            targetCosmetic.ObjectID = newEnum
+                                        end
+                                    end)
+                                else
+                                    targetCosmetic.ObjectID = math.random(1000, 999999)
+                                end
+                                forceUpdateWeapon(selectedWeapon)
+                            end
+                        end)
                     end
 
                     local function unequipCurrent()
@@ -860,8 +871,16 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         if not selectedWeapon then return end
                         local list = {}
                         for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                            if isValidCosmeticForWeapon(name, selectedWeapon, currentCategory) then
-                                table.insert(list, name)
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local t = tostring(cosmetic.Type or ""):lower()
+                                local n = name:lower()
+                                local match = false
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then match = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then match = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then match = true end
+                                if match then
+                                    table.insert(list, name)
+                                end
                             end
                         end
                         if #list > 0 then
@@ -885,11 +904,9 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                                     if weaponName then
                                         equipped[weaponName] = equipped[weaponName] or {}
                                         if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
-                                            if isValidCosmeticForWeapon(cosmeticName, weaponName, cosmeticType) then
-                                                local cloned = cloneCosmetic(cosmeticName, cosmeticType)
-                                                if cloned then
-                                                    equipped[weaponName][cosmeticType] = cloned
-                                                end
+                                            local cloned = cloneCosmetic(cosmeticName, cosmeticType)
+                                            if cloned then
+                                                equipped[weaponName][cosmeticType] = cloned
                                             end
                                         else
                                             equipped[weaponName][cosmeticType] = nil
@@ -1208,9 +1225,16 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         
                         local count = 0
                         for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                            if selectedWeapon and isValidCosmeticForWeapon(name, selectedWeapon, currentCategory) then
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local typeMatch = false
+                                local t = tostring(cosmetic.Type or ""):lower()
                                 local n = name:lower()
-                                if (not filter or filter == "" or n:find(filter:lower())) then
+                                
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then typeMatch = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then typeMatch = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then typeMatch = true end
+                                
+                                if typeMatch and (not filter or filter == "" or n:find(filter:lower())) then
                                     if not (showOnlyFavorites and not favorites[name]) then
                                         count += 1
                                         local btn = Instance.new("TextButton")
