@@ -1,0 +1,2934 @@
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
+local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+local LocalPlayer = Players.LocalPlayer
+local Camera = workspace.CurrentCamera
+
+local repS = cloneref and cloneref(ReplicatedStorage) or ReplicatedStorage
+local plrs = cloneref and cloneref(Players) or Players
+local runS = cloneref and cloneref(RunService) or RunService
+
+local util, enum, FighterController, SpectateController
+pcall(function()
+    util = require(repS.Modules.Utility)
+    enum = require(repS.Modules.EnumLibrary)
+    FighterController = require(LocalPlayer.PlayerScripts.Controllers.FighterController)
+    SpectateController = require(LocalPlayer.PlayerScripts.Controllers:WaitForChild("SpectateController"))
+end)
+
+getgenv().Config = {
+    Enabled = true,
+    FireRate = 0,
+    WeaponSlot = "Melee"
+}
+
+local slots = {
+    Primary = 1,
+    Secondary = 2,
+    Melee = 3
+}
+
+local function getSlotNumber()
+    return slots[getgenv().Config.WeaponSlot] or 3
+end
+
+local currentSpeed = 100000000
+local currentStuds = 50
+local isUEKillersOn = false
+local isAxeCounterOn = false
+local isRagebotOn = false
+local isManipulacionOn = false
+local isInVoidPhase = false
+local VoidPhaseEnabled = false
+local lockedYPosition = nil
+local initialPosition = nil
+
+local rageOffsetX = 0
+local rageOffsetY = 0
+local rageOffsetZ = 0
+
+-- Variables para Underground Manipulation
+local UndergroundManipulationEnabled = false
+local undergroundTimer = 0
+local currentUndergroundOffset = Vector3.new(0, -5, 0)
+local undergroundAnchorPos = nil
+
+-- Rango de Auto Fire personalizable
+local autoFireRange = 50
+
+-- Personalización del StatusLabel
+local customStatusPrefix = "RAGEBOTING"
+local randomStatusMode = false
+local randomWords = {"APOCALYPSE", "DESTROYING", "ANNIHILATING", "GODMODE", "RAGE", "DOMINATING", "VOID"}
+
+local AutoPrioritized = true
+local PriorityMode = "Closest"
+local lastPrioritizedPlayer = nil
+local lastNotifyTime = 0
+local playerVelocityHistory = {}
+
+local ResolverEnabled = false
+local KillDelay = 0
+local AntiCounterEnabled = false
+local UndergroundHeight = 5.6
+local lastKillTime = 0
+
+local sideOffset = 4.5
+local spinSpeed = 350
+local sideSpeed = 750
+local randomJoints = true
+local forceNoCollision = true
+local angle = 0
+
+local verticalRange = 80
+local teleportIntensity = 1
+local ueNoCollision = true
+local ueGodmode = true
+local ueAutoEquip = true
+local ueShoot = true
+
+-- Variables para Anti-Aim y Camera Shake
+local AntiAimEnabled = false
+local AntiAimMode = "Spin"
+local AntiAimSpeed = 500
+local AntiAimIntensity = 5
+local CameraShakeIntensity = 2
+
+-- Variables para Underground (Nativo solicitado)
+local MiscUndergroundEnabled = false
+
+local ESPEnabled = false
+local ESPBox = false
+local ESPName = false
+local ESPDistance = false
+local ESPHealth = false
+local ESPTracer = false
+local ESPChams = false
+local ESPHeadDot = false
+local ESPOffscreenArrows = false
+local ESPTeamCheck = true
+local ESPMaxDistance = 2000
+local ESPBoxColor = Color3.fromRGB(0, 255, 128)
+local ESPNameColor = Color3.fromRGB(255, 255, 255)
+local ESPTracerColor = Color3.fromRGB(0, 255, 128)
+
+local Drawings = {}
+local Highlights = {}
+
+local MiscSpeedBoost = 50
+local MiscJumpPower = 50
+local MiscHipHeight = 2
+local MiscFOV = 70
+local SpinbotEnabled = false
+local SpinbotSpeed = 500
+
+local RageGui = Instance.new("ScreenGui")
+RageGui.Name = "RagebotStatusGui"
+RageGui.ResetOnSpawn = false
+pcall(function()
+    RageGui.Parent = CoreGui
+end)
+
+local StatusLabel = Instance.new("TextLabel")
+StatusLabel.Name = "StatusLabel"
+StatusLabel.Size = UDim2.new(0, 500, 0, 50)
+StatusLabel.AnchorPoint = Vector2.new(0.5, 0.5)
+StatusLabel.Position = UDim2.new(0.5, 0, 0.35, 0)
+StatusLabel.BackgroundTransparency = 1
+StatusLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+StatusLabel.TextStrokeTransparency = 0
+StatusLabel.TextSize = 22
+StatusLabel.Font = Enum.Font.Code
+StatusLabel.Text = "VOID"
+StatusLabel.Parent = RageGui
+
+local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
+local Library = loadstring(game:HttpGet(repo.."Library.lua"))()
+local ThemeManager = loadstring(game:HttpGet(repo.."addons/ThemeManager.lua"))()
+local SaveManager = loadstring(game:HttpGet(repo.."addons/SaveManager.lua"))()
+
+local Options = Library.Options
+
+Library.ForceCheckbox = false
+Library.ShowToggleFrameInKeybinds = true
+
+local Window = Library:CreateWindow({
+    Title = "AXE COUNTER GG V2",
+    Footer = "DISCORD.GG/SDAPD5UXC",
+    Icon = 95816097006870,
+    NotifySide = "Right",
+    ShowCustomCursor = true
+})
+
+local Tabs = {
+    ["COUNTERS GG V2"] = Window:AddTab("COUNTERS GG V2", "home"),
+    ["Ragebot"] = Window:AddTab("Ragebot", "crosshair"),
+    ["Visuals"] = Window:AddTab("Visuals", "eye"),
+    ["Misc"] = Window:AddTab("Misc", "settings"),
+    ["UI Settings"] = Window:AddTab("UI Settings", "settings")
+}
+
+local MainGroup = Tabs["COUNTERS GG V2"]:AddLeftGroupbox("UE COUNTER")
+
+MainGroup:AddToggle("UEKillersToggle", {
+    Text = "ENABLED",
+    Default = false,
+    Callback = function(Value)
+        isUEKillersOn = Value
+    end
+})
+
+MainGroup:AddSlider("SpeedSlider", {
+    Text = "Velocidad Extrema",
+    Default = 100000000,
+    Min = 100000000,
+    Max = 999999999,
+    Rounding = 0,
+    Callback = function(Value)
+        currentSpeed = Value
+    end
+})
+
+MainGroup:AddSlider("StudsSlider", {
+    Text = "Distancia Studs",
+    Default = 50,
+    Min = 1,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        currentStuds = Value
+    end
+})
+
+MainGroup:AddSlider("VerticalRangeSlider", {
+    Text = "Vertical Range",
+    Default = 80,
+    Min = 20,
+    Max = 200,
+    Rounding = 0,
+    Callback = function(Value)
+        verticalRange = Value
+    end
+})
+
+MainGroup:AddSlider("TeleportIntensitySlider", {
+    Text = "Teleport Intensity",
+    Default = 1,
+    Min = 0.3,
+    Max = 2,
+    Rounding = 1,
+    Callback = function(Value)
+        teleportIntensity = Value
+    end
+})
+
+MainGroup:AddToggle("UENoCollision", {
+    Text = "Force No Collision",
+    Default = true,
+    Callback = function(Value)
+        ueNoCollision = Value
+    end
+})
+
+MainGroup:AddToggle("UEGodmode", {
+    Text = "Godmode",
+    Default = true,
+    Callback = function(Value)
+        ueGodmode = Value
+    end
+})
+
+MainGroup:AddToggle("UEAutoEquip", {
+    Text = "Auto Equip",
+    Default = true,
+    Callback = function(Value)
+        ueAutoEquip = Value
+    end
+})
+
+MainGroup:AddToggle("UEShoot", {
+    Text = "Shoot While Active",
+    Default = true,
+    Callback = function(Value)
+        ueShoot = Value
+    end
+})
+
+local AxeGroup = Tabs["COUNTERS GG V2"]:AddRightGroupbox("KICIA COUNTER")
+
+AxeGroup:AddToggle("AxeCounterToggle", {
+    Text = "ENABLED",
+    Default = false,
+    Callback = function(Value)
+        isAxeCounterOn = Value
+    end
+})
+
+AxeGroup:AddSlider("SideOffsetSlider", {
+    Text = "Side Offset",
+    Default = 4.5,
+    Min = 1,
+    Max = 15,
+    Rounding = 1,
+    Callback = function(Value)
+        sideOffset = Value
+    end
+})
+
+AxeGroup:AddSlider("SpinSpeedSlider", {
+    Text = "Spin Speed",
+    Default = 350,
+    Min = 50,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        spinSpeed = Value
+    end
+})
+
+AxeGroup:AddSlider("SideSpeedSlider", {
+    Text = "Side Move Speed",
+    Default = 750,
+    Min = 100,
+    Max = 2000,
+    Rounding = 0,
+    Callback = function(Value)
+        sideSpeed = Value
+    end
+})
+
+AxeGroup:AddToggle("RandomJointsToggle", {
+    Text = "Random Joints",
+    Default = true,
+    Callback = function(Value)
+        randomJoints = Value
+    end
+})
+
+AxeGroup:AddToggle("ForceNoCollision", {
+    Text = "Force No Collision",
+    Default = true,
+    Callback = function(Value)
+        forceNoCollision = Value
+    end
+})
+
+local RageGroup = Tabs["Ragebot"]:AddLeftGroupbox("Ragebot Controls")
+
+RageGroup:AddToggle("RagebotToggle", {
+    Text = "ENABLED",
+    Default = false,
+    Callback = function(Value)
+        isRagebotOn = Value
+        if not Value then
+            StatusLabel.Text = "VOID"
+            isInVoidPhase = false
+            undergroundAnchorPos = nil
+        end
+    end
+})
+
+RageGroup:AddToggle("ManipulacionToggle", {
+    Text = "MANIPULACIÓN",
+    Default = false,
+    Callback = function(Value)
+        isManipulacionOn = Value
+    end
+})
+
+RageGroup:AddToggle("UndergroundManipulationToggle", {
+    Text = "Underground Manipulation",
+    Default = false,
+    Callback = function(Value)
+        UndergroundManipulationEnabled = Value
+        if not Value then
+            undergroundAnchorPos = nil
+        end
+    end
+})
+
+RageGroup:AddToggle("VoidPhaseToggle", {
+    Text = "ENABLED VOID PHASE (NOT RECOMENDED)",
+    Default = false,
+    Callback = function(Value)
+        VoidPhaseEnabled = Value
+    end
+})
+
+RageGroup:AddToggle("ResolverToggle", {
+    Text = "Resolver",
+    Default = false,
+    Callback = function(Value)
+        ResolverEnabled = Value
+    end
+})
+
+RageGroup:AddToggle("AntiCounterToggle", {
+    Text = "Anti-Counter",
+    Default = false,
+    Callback = function(Value)
+        AntiCounterEnabled = Value
+    end
+})
+
+RageGroup:AddInput("CustomStatusInput", {
+    Default = "RAGEBOTING",
+    Numeric = false,
+    Finished = true,
+    Text = "Status Prefix Text",
+    Placeholder = "Ej. RAGEBOT",
+    Callback = function(Value)
+        if Value and Value ~= "" then
+            customStatusPrefix = Value
+        end
+    end
+})
+
+RageGroup:AddToggle("RandomStatusToggle", {
+    Text = "Random Status Text Mode",
+    Default = false,
+    Callback = function(Value)
+        randomStatusMode = Value
+    end
+})
+
+RageGroup:AddSlider("KillDelaySlider", {
+    Text = "Kill Delay",
+    Default = 0,
+    Min = 0,
+    Max = 2,
+    Rounding = 2,
+    Callback = function(Value)
+        KillDelay = Value
+    end
+})
+
+RageGroup:AddSlider("AutoFireRangeSlider", {
+    Text = "Auto Fire Range (Studs)",
+    Default = 50,
+    Min = 5,
+    Max = 10000,
+    Rounding = 0,
+    Callback = function(Value)
+        autoFireRange = Value
+    end
+})
+
+RageGroup:AddLabel("Ragebot Keybind"):AddKeyPicker("RagebotKeybind", {
+    Default = "C",
+    Text = "Toggle Ragebot",
+    Mode = "Toggle",
+    Callback = function(Value)
+        isRagebotOn = Value
+        if Options.RagebotToggle then
+            Options.RagebotToggle:SetValue(Value)
+        end
+        if not Value then
+            StatusLabel.Text = "VOID"
+            isInVoidPhase = false
+            undergroundAnchorPos = nil
+        end
+    end
+})
+
+RageGroup:AddSlider("RageOffsetX", {
+    Text = "Offset Posición X",
+    Default = 0,
+    Min = -50,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        rageOffsetX = Value
+    end
+})
+
+RageGroup:AddSlider("RageOffsetY", {
+    Text = "Offset Posición Y",
+    Default = 0,
+    Min = -50,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        rageOffsetY = Value
+    end
+})
+
+RageGroup:AddSlider("RageOffsetZ", {
+    Text = "Offset Posición Z",
+    Default = 0,
+    Min = -50,
+    Max = 50,
+    Rounding = 1,
+    Callback = function(Value)
+        rageOffsetZ = Value
+    end
+})
+
+local PriorityGroup = Tabs["Ragebot"]:AddRightGroupbox("Auto Prioritized")
+
+PriorityGroup:AddToggle("AutoPrioritizedToggle", {
+    Text = "ENABLED",
+    Default = true,
+    Callback = function(Value)
+        AutoPrioritized = Value
+    end
+})
+
+PriorityGroup:AddDropdown("PriorityModeDropdown", {
+    Values = {"Closest", "VALUE (HP)", "CHARACTER"},
+    Default = 1,
+    Multi = false,
+    Text = "Priority Mode",
+    Callback = function(Value)
+        PriorityMode = Value
+    end
+})
+
+local ESPGroup = Tabs["Visuals"]:AddLeftGroupbox("ESP")
+
+ESPGroup:AddToggle("ESPEnabled", {
+    Text = "ESP Enabled",
+    Default = false,
+    Callback = function(Value)
+        ESPEnabled = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPBox", {
+    Text = "Box ESP",
+    Default = false,
+    Callback = function(Value)
+        ESPBox = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPName", {
+    Text = "Name ESP",
+    Default = false,
+    Callback = function(Value)
+        ESPName = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPDistance", {
+    Text = "Distance ESP",
+    Default = false,
+    Callback = function(Value)
+        ESPDistance = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPHealth", {
+    Text = "Health ESP",
+    Default = false,
+    Callback = function(Value)
+        ESPHealth = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPTracer", {
+    Text = "Tracers",
+    Default = false,
+    Callback = function(Value)
+        ESPTracer = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPChams", {
+    Text = "Chams",
+    Default = false,
+    Callback = function(Value)
+        ESPChams = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPHeadDot", {
+    Text = "Head Dot",
+    Default = false,
+    Callback = function(Value)
+        ESPHeadDot = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPOffscreenArrows", {
+    Text = "Offscreen Arrows",
+    Default = false,
+    Callback = function(Value)
+        ESPOffscreenArrows = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPTeamCheck", {
+    Text = "Team Check",
+    Default = true,
+    Callback = function(Value)
+        ESPTeamCheck = Value
+    end
+})
+
+ESPGroup:AddSlider("ESPMaxDistance", {
+    Text = "Max Distance",
+    Default = 2000,
+    Min = 100,
+    Max = 5000,
+    Rounding = 0,
+    Callback = function(Value)
+        ESPMaxDistance = Value
+    end
+})
+
+-- SCRIPT INTEGRADO DE COSMETIC CHANGER CON CONTROL DE VISIBILIDAD
+local CosmeticsGroup = Tabs["Visuals"]:AddRightGroupbox("Cosmetics")
+
+local cosmeticInstance = nil
+
+CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
+    Text = "Show Cosmetic Changer",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            if not cosmeticInstance then
+                pcall(function()
+                    local TweenService = game:GetService("TweenService")
+                    local HttpService = game:GetService("HttpService")
+                    
+                    local playerScripts = LocalPlayer:WaitForChild("PlayerScripts")
+                    local controllers = playerScripts:WaitForChild("Controllers")
+
+                    local EnumLibrary = require(ReplicatedStorage.Modules:WaitForChild("EnumLibrary", 10))
+                    if EnumLibrary then
+                        pcall(function()
+                            EnumLibrary:WaitForEnumBuilder()
+                        end)
+                    end
+
+                    local CosmeticLibrary = require(ReplicatedStorage.Modules:WaitForChild("CosmeticLibrary", 10))
+                    local ItemLibrary = require(ReplicatedStorage.Modules:WaitForChild("ItemLibrary", 10))
+                    local DataController = require(controllers:WaitForChild("PlayerDataController", 10))
+
+                    local equipped = {}
+                    local favorites = {}
+                    local currentCategory = "Skin"
+                    local selectedWeapon = nil
+                    local currentWeaponTab = "Primary"
+                    local showOnlyFavorites = false
+
+                    local WEAPON_CATEGORIES = {
+                        Primary = {"Assault Rifle", "Bow", "Burst Rifle", "Crossbow", "Distortion", "Energy Rifle", "Flamethrower", "Grenade Launcher", "Gunblade", "Minigun", "Paintball Gun", "Permafrost", "RPG", "Scepter", "Shotgun", "Sniper", "Wildcat"},
+                        Secondary = {"Daggers", "Energy Pistols", "Exogun", "Flare Gun", "Glass Cannon", "Handgun", "Revolver", "Shorty", "Slingshot", "Spray", "Uzi", "Warper"},
+                        Melee = {"Battle Axe", "Chainsaw", "Fists", "Glast Shard", "Katana", "Knife", "Maul", "Riot Shield", "Scythe", "Spear", "Trowel"},
+                        Utility = {"Flashbang", "Freeze Ray", "Grenade", "Jump Pad", "Medkit", "Molotov", "Satchel", "Smoke Grenade", "Subspace Tripmine", "War Horn", "Warpstone", "Grappler"}
+                    }
+
+                    local function formatAssetId(val)
+                        if not val then return nil end
+                        local str = tostring(val)
+                        if str:find("rbxasset") then
+                            return str
+                        elseif str:match("^%d+$") then
+                            return "rbxassetid://" .. str
+                        end
+                        return str
+                    end
+
+                    local function getAssetImage(targetName, isWeapon)
+                        if isWeapon and ItemLibrary and ItemLibrary.Items then
+                            local item = ItemLibrary.Items[targetName]
+                            if item then
+                                local raw = item.Image or item.Icon or item.Texture or item.TextureId
+                                local formatted = formatAssetId(raw)
+                                if formatted then return formatted end
+                            end
+                        elseif not isWeapon and CosmeticLibrary and CosmeticLibrary.Cosmetics then
+                            local cosmetic = CosmeticLibrary.Cosmetics[targetName]
+                            if cosmetic then
+                                local raw = cosmetic.Image or cosmetic.Icon or cosmetic.Thumbnail or cosmetic.Texture or cosmetic.TextureId
+                                local formatted = formatAssetId(raw)
+                                if formatted then return formatted end
+                            end
+                        end
+                        return "rbxassetid://6023426915"
+                    end
+
+                    local function isWeaponCosmetic(name, cosmetic)
+                        if not name then return false end
+                        local n = tostring(name):lower()
+                        local t = (cosmetic and tostring(cosmetic.Type or ""):lower()) or ""
+                        if t:find("finisher") or t:find("emote") or t:find("dance") or t:find("kill") then
+                            return false
+                        end
+                        if t == "skin" or t == "charm" or t == "wrap" or t == "wrapping" then
+                            return true
+                        end
+                        if n:find("skin") or n:find("charm") or n:find("wrap") then
+                            return true
+                        end
+                        if cosmetic and (cosmetic.Seed or cosmetic.ObjectID or cosmetic.Enum) then
+                            return true
+                        end
+                        return false
+                    end
+
+                    local function cloneCosmetic(name, cosmeticType)
+                        local base = CosmeticLibrary.Cosmetics[name]
+                        if not base then return nil end
+                        local data = {}
+                        for k, v in pairs(base) do
+                            data[k] = v
+                        end
+                        data.Name = name
+                        data.Type = data.Type or cosmeticType or "Skin"
+                        data.Seed = data.Seed or math.random(1, 999999)
+                        if EnumLibrary then
+                            local ok, enumId = pcall(function()
+                                return EnumLibrary:ToEnum(name)
+                            end)
+                            if ok and enumId then
+                                data.Enum = enumId
+                                data.ObjectID = data.ObjectID or enumId
+                            end
+                        end
+                        if data.Inverted == nil then data.Inverted = false end
+                        if data.OnlyUseFavorites == nil then data.OnlyUseFavorites = false end
+                        return data
+                    end
+
+                    local saveFile = "axe_skinchanger/config.json"
+
+                    local function saveConfig()
+                        if not writefile then return end
+                        pcall(function()
+                            local config = {equipped = {}, favorites = favorites}
+                            for weapon, cosmetics in pairs(equipped) do
+                                config.equipped[weapon] = {}
+                                for ctype, cdata in pairs(cosmetics) do
+                                    if cdata and cdata.Name then
+                                        config.equipped[weapon][ctype] = {name = cdata.Name, seed = cdata.Seed}
+                                    end
+                                end
+                            end
+                            makefolder("axe_skinchanger")
+                            writefile(saveFile, HttpService:JSONEncode(config))
+                        end)
+                    end
+
+                    local function loadConfig()
+                        if not (readfile and isfile and isfile(saveFile)) then return end
+                        pcall(function()
+                            local config = HttpService:JSONDecode(readfile(saveFile))
+                            if config.equipped then
+                                for weapon, cosmetics in pairs(config.equipped) do
+                                    equipped[weapon] = {}
+                                    for ctype, cdata in pairs(cosmetics) do
+                                        local cloned = cloneCosmetic(cdata.name, ctype)
+                                        if cloned then
+                                            cloned.Seed = cdata.seed or cloned.Seed
+                                            equipped[weapon][ctype] = cloned
+                                        end
+                                    end
+                                end
+                            end
+                            if config.favorites then
+                                favorites = config.favorites
+                            end
+                        end)
+                    end
+
+                    local originalOwns = CosmeticLibrary.OwnsCosmetic
+                    CosmeticLibrary.OwnsCosmetic = function(self, inventory, name, weapon)
+                        if name:find("MISSING_") then
+                            return originalOwns(self, inventory, name, weapon)
+                        end
+                        local cosmetic = CosmeticLibrary.Cosmetics[name]
+                        if isWeaponCosmetic(name, cosmetic) then
+                            return true
+                        end
+                        return originalOwns(self, inventory, name, weapon)
+                    end
+
+                    for _, funcName in pairs({"OwnsCosmeticNormally", "OwnsCosmeticUniversally", "OwnsCosmeticForWeapon"}) do
+                        if CosmeticLibrary[funcName] then
+                            CosmeticLibrary[funcName] = function(_, _, name)
+                                local c = CosmeticLibrary.Cosmetics[name]
+                                return isWeaponCosmetic(name, c)
+                            end
+                        end
+                    end
+
+                    local originalGet = DataController.Get
+                    DataController.Get = function(self, key)
+                        local data = originalGet(self, key)
+                        if key == "CosmeticInventory" then
+                            local proxy = {}
+                            for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                                if isWeaponCosmetic(name, cosmetic) then
+                                    proxy[name] = true
+                                end
+                            end
+                            return setmetatable(proxy, {
+                                __index = function(_, k)
+                                    local c = CosmeticLibrary.Cosmetics[k]
+                                    if isWeaponCosmetic(k, c) then
+                                        return true
+                                    end
+                                end
+                            })
+                        end
+                        return data
+                    end
+
+                    local originalGetWeaponData = DataController.GetWeaponData
+                    DataController.GetWeaponData = function(self, weaponName)
+                        local data = originalGetWeaponData(self, weaponName)
+                        if not data then return nil end
+                        local merged = {}
+                        for k, v in pairs(data) do
+                            merged[k] = v
+                        end
+                        merged.Name = weaponName
+                        if equipped[weaponName] then
+                            for ctype, cdata in pairs(equipped[weaponName]) do
+                                merged[ctype] = cdata
+                            end
+                        end
+                        return merged
+                    end
+
+                    local function forceUpdateWeapon(weaponName)
+                        pcall(function()
+                            if DataController.CurrentData then
+                                DataController.CurrentData:Replicate("WeaponInventory")
+                            end
+                        end)
+                    end
+
+                    local showNotify = function(text) end
+
+                    local function equipCosmetic(name, ctype)
+                        if not selectedWeapon then return end
+                        equipped[selectedWeapon] = equipped[selectedWeapon] or {}
+                        local cloned = cloneCosmetic(name, ctype)
+                        if not cloned then return end
+                        equipped[selectedWeapon][ctype] = cloned
+                        forceUpdateWeapon(selectedWeapon)
+                        saveConfig()
+                        showNotify("✓ " .. name)
+
+                        task.delay(0.5, function()
+                            if equipped[selectedWeapon] and equipped[selectedWeapon][ctype] then
+                                local targetCosmetic = equipped[selectedWeapon][ctype]
+                                if EnumLibrary then
+                                    pcall(function()
+                                        local newEnum = EnumLibrary:ToEnum(targetCosmetic.Name)
+                                        if newEnum then
+                                            targetCosmetic.Enum = newEnum
+                                            targetCosmetic.ObjectID = newEnum
+                                        end
+                                    end)
+                                else
+                                    targetCosmetic.ObjectID = math.random(1000, 999999)
+                                end
+                                forceUpdateWeapon(selectedWeapon)
+                            end
+                        end)
+                    end
+
+                    local function unequipCurrent()
+                        if not selectedWeapon then return end
+                        if equipped[selectedWeapon] then
+                            equipped[selectedWeapon][currentCategory] = nil
+                            if not next(equipped[selectedWeapon]) then
+                                equipped[selectedWeapon] = nil
+                            end
+                            forceUpdateWeapon(selectedWeapon)
+                            saveConfig()
+                            showNotify("Removido")
+                        end
+                    end
+
+                    local function randomSkin()
+                        if not selectedWeapon then return end
+                        local list = {}
+                        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local t = tostring(cosmetic.Type or ""):lower()
+                                local n = name:lower()
+                                local match = false
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then match = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then match = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then match = true end
+                                if match then
+                                    table.insert(list, name)
+                                end
+                            end
+                        end
+                        if #list > 0 then
+                            equipCosmetic(list[math.random(1, #list)], currentCategory)
+                        end
+                    end
+
+                    if hookmetamethod then
+                        local remotes = ReplicatedStorage:FindFirstChild("Remotes")
+                        local dataRemotes = remotes and remotes:FindFirstChild("Data")
+                        local equipRemote = dataRemotes and dataRemotes:FindFirstChild("EquipCosmetic")
+                        if equipRemote then
+                            local old
+                            old = hookmetamethod(game, "__namecall", function(self, ...)
+                                if getnamecallmethod() ~= "FireServer" then
+                                    return old(self, ...)
+                                end
+                                local args = {...}
+                                if self == equipRemote then
+                                    local weaponName, cosmeticType, cosmeticName = args[1], args[2], args[3]
+                                    if weaponName then
+                                        equipped[weaponName] = equipped[weaponName] or {}
+                                        if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
+                                            local cloned = cloneCosmetic(cosmeticName, cosmeticType)
+                                            if cloned then
+                                                equipped[weaponName][cosmeticType] = cloned
+                                            end
+                                        else
+                                            equipped[weaponName][cosmeticType] = nil
+                                        end
+                                        task.defer(function()
+                                            forceUpdateWeapon(weaponName)
+                                            saveConfig()
+                                        end)
+                                    end
+                                    return
+                                end
+                                return old(self, ...)
+                            end)
+                        end
+                    end
+
+                    pcall(function()
+                        local ClientItem = require(LocalPlayer.PlayerScripts.Modules.ClientReplicatedClasses.ClientFighter.ClientItem)
+                        if ClientItem and ClientItem._CreateViewModel then
+                            local original = ClientItem._CreateViewModel
+                            ClientItem._CreateViewModel = function(self, viewmodelRef)
+                                local weaponName = self.Name
+                                local weaponPlayer = self.ClientFighter and self.ClientFighter.Player
+                                if weaponPlayer == LocalPlayer and equipped[weaponName] and viewmodelRef then
+                                    local dataKey = self:ToEnum("Data")
+                                    local target = viewmodelRef[dataKey] or viewmodelRef.Data
+                                    if target then
+                                        if equipped[weaponName].Skin then
+                                            target[self:ToEnum("Skin") or "Skin"] = equipped[weaponName].Skin
+                                            target[self:ToEnum("Name") or "Name"] = equipped[weaponName].Skin.Name
+                                        end
+                                        if equipped[weaponName].Charm then
+                                            target[self:ToEnum("Charm") or "Charm"] = equipped[weaponName].Charm
+                                        end
+                                        if equipped[weaponName].Wrap then
+                                            target[self:ToEnum("Wrap") or "Wrap"] = equipped[weaponName].Wrap
+                                        end
+                                    end
+                                end
+                                return original(self, viewmodelRef)
+                            end
+                        end
+                    end)
+
+                    local MainGui = Instance.new("ScreenGui")
+                    MainGui.Name = "AxeSkinchangerUI"
+                    MainGui.ResetOnSpawn = false
+                    MainGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+                    MainGui.Parent = (gethui and gethui()) or CoreGui
+                    cosmeticInstance = MainGui
+
+                    local MainFrameUI = Instance.new("Frame")
+                    MainFrameUI.Size = UDim2.new(0, 720, 0, 540)
+                    MainFrameUI.Position = UDim2.new(0.5, -360, 0.5, -270)
+                    MainFrameUI.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    MainFrameUI.BorderSizePixel = 0
+                    MainFrameUI.Visible = true
+                    MainFrameUI.Parent = MainGui
+                    Instance.new("UICorner", MainFrameUI).CornerRadius = UDim.new(0, 8)
+                    local MainStroke = Instance.new("UIStroke")
+                    MainStroke.Color = Color3.fromRGB(35, 35, 35)
+                    MainStroke.Thickness = 1
+                    MainStroke.Parent = MainFrameUI
+
+                    local TitleBar = Instance.new("Frame")
+                    TitleBar.Size = UDim2.new(1, 0, 0, 36)
+                    TitleBar.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+                    TitleBar.BorderSizePixel = 0
+                    TitleBar.Parent = MainFrameUI
+                    Instance.new("UICorner", TitleBar).CornerRadius = UDim.new(0, 8)
+
+                    local TitleLabel = Instance.new("TextLabel")
+                    TitleLabel.Size = UDim2.new(1, -40, 1, 0)
+                    TitleLabel.Position = UDim2.new(0, 12, 0, 0)
+                    TitleLabel.BackgroundTransparency = 1
+                    TitleLabel.Text = "AXE SKINCHANGER"
+                    TitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    TitleLabel.TextSize = 11
+                    TitleLabel.Font = Enum.Font.GothamBold
+                    TitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+                    TitleLabel.Parent = TitleBar
+
+                    local MinimizeBtn = Instance.new("TextButton")
+                    MinimizeBtn.Size = UDim2.new(0, 24, 0, 24)
+                    MinimizeBtn.Position = UDim2.new(1, -30, 0.5, -12)
+                    MinimizeBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    MinimizeBtn.BorderSizePixel = 0
+                    MinimizeBtn.Text = "–"
+                    MinimizeBtn.TextColor3 = Color3.fromRGB(200, 200, 200)
+                    MinimizeBtn.TextSize = 12
+                    MinimizeBtn.Font = Enum.Font.GothamBold
+                    MinimizeBtn.Parent = TitleBar
+                    Instance.new("UICorner", MinimizeBtn).CornerRadius = UDim.new(0, 4)
+
+                    local ContentFrame = Instance.new("Frame")
+                    ContentFrame.Size = UDim2.new(1, 0, 1, -36)
+                    ContentFrame.Position = UDim2.new(0, 0, 0, 36)
+                    ContentFrame.BackgroundTransparency = 1
+                    ContentFrame.Parent = MainFrameUI
+
+                    local MainLayoutFrame = Instance.new("Frame")
+                    MainLayoutFrame.Size = UDim2.new(1, 0, 1, 0)
+                    MainLayoutFrame.BackgroundTransparency = 1
+                    MainLayoutFrame.Parent = ContentFrame
+
+                    local WeaponSection = Instance.new("Frame")
+                    WeaponSection.Size = UDim2.new(1, 0, 0.46, 0)
+                    WeaponSection.Position = UDim2.new(0, 0, 0, 0)
+                    WeaponSection.BackgroundTransparency = 1
+                    WeaponSection.Parent = MainLayoutFrame
+
+                    local TabBar = Instance.new("Frame")
+                    TabBar.Size = UDim2.new(1, -16, 0, 26)
+                    TabBar.Position = UDim2.new(0, 8, 0, 4)
+                    TabBar.BackgroundTransparency = 1
+                    TabBar.Parent = WeaponSection
+
+                    local tabButtons = {}
+                    local tabNames = {"Primary", "Secondary", "Melee", "Utility"}
+                    for i, tabName in ipairs(tabNames) do
+                        local btn = Instance.new("TextButton")
+                        btn.Size = UDim2.new(0.24, -3, 1, 0)
+                        btn.Position = UDim2.new((i - 1) * 0.25, 0, 0, 0)
+                        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                        btn.BorderSizePixel = 0
+                        btn.Text = tabName
+                        btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                        btn.TextSize = 10
+                        btn.Font = Enum.Font.GothamBold
+                        btn.Parent = TabBar
+                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+                        tabButtons[tabName] = btn
+                    end
+
+                    local WeaponSearch = Instance.new("TextBox")
+                    WeaponSearch.Size = UDim2.new(1, -16, 0, 26)
+                    WeaponSearch.Position = UDim2.new(0, 8, 0, 34)
+                    WeaponSearch.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+                    WeaponSearch.BorderSizePixel = 0
+                    WeaponSearch.PlaceholderText = " Buscar arma..."
+                    WeaponSearch.Text = ""
+                    WeaponSearch.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    WeaponSearch.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
+                    WeaponSearch.TextSize = 10
+                    WeaponSearch.Font = Enum.Font.Gotham
+                    WeaponSearch.Parent = WeaponSection
+                    Instance.new("UICorner", WeaponSearch).CornerRadius = UDim.new(0, 4)
+                    local WSearchStroke = Instance.new("UIStroke")
+                    WSearchStroke.Color = Color3.fromRGB(30, 30, 30)
+                    WSearchStroke.Thickness = 1
+                    WSearchStroke.Parent = WeaponSearch
+
+                    local WeaponList = Instance.new("ScrollingFrame")
+                    WeaponList.Size = UDim2.new(1, -16, 1, -66)
+                    WeaponList.Position = UDim2.new(0, 8, 0, 64)
+                    WeaponList.BackgroundTransparency = 1
+                    WeaponList.BorderSizePixel = 0
+                    WeaponList.ScrollBarThickness = 3
+                    WeaponList.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+                    WeaponList.CanvasSize = UDim2.new(0, 0, 0, 0)
+                    WeaponList.Parent = WeaponSection
+
+                    local WeaponGrid = Instance.new("UIGridLayout")
+                    WeaponGrid.CellSize = UDim2.new(0, 78, 0, 78)
+                    WeaponGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+                    WeaponGrid.SortOrder = Enum.SortOrder.Name
+                    WeaponGrid.Parent = WeaponList
+
+                    local WeaponPadding = Instance.new("UIPadding")
+                    WeaponPadding.PaddingTop = UDim.new(0, 4)
+                    WeaponPadding.PaddingLeft = UDim.new(0, 4)
+                    WeaponPadding.PaddingRight = UDim.new(0, 4)
+                    WeaponPadding.Parent = WeaponList
+
+                    local CosmeticSection = Instance.new("Frame")
+                    CosmeticSection.Size = UDim2.new(1, 0, 0.54, 0)
+                    CosmeticSection.Position = UDim2.new(0, 0, 0.46, 0)
+                    CosmeticSection.BackgroundTransparency = 1
+                    CosmeticSection.Parent = MainLayoutFrame
+
+                    local Categories = Instance.new("Frame")
+                    Categories.Size = UDim2.new(1, -16, 0, 26)
+                    Categories.Position = UDim2.new(0, 8, 0, 4)
+                    Categories.BackgroundTransparency = 1
+                    Categories.Parent = CosmeticSection
+
+                    local categoryButtons = {}
+                    local cats = {"Skin", "Charm", "Wrap"}
+                    for i, cat in ipairs(cats) do
+                        local btn = Instance.new("TextButton")
+                        btn.Size = UDim2.new(0.32, -3, 1, 0)
+                        btn.Position = UDim2.new((i - 1) * 0.333, 0, 0, 0)
+                        btn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                        btn.BorderSizePixel = 0
+                        btn.Text = cat
+                        btn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                        btn.TextSize = 10
+                        btn.Font = Enum.Font.GothamBold
+                        btn.Parent = Categories
+                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 4)
+                        categoryButtons[cat] = btn
+                    end
+
+                    local SubActionBar = Instance.new("Frame")
+                    SubActionBar.Size = UDim2.new(1, -16, 0, 26)
+                    SubActionBar.Position = UDim2.new(0, 8, 0, 34)
+                    SubActionBar.BackgroundTransparency = 1
+                    SubActionBar.Parent = CosmeticSection
+
+                    local RandomBtn = Instance.new("TextButton")
+                    RandomBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    RandomBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    RandomBtn.BorderSizePixel = 0
+                    RandomBtn.Text = "Rand"
+                    RandomBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    RandomBtn.TextSize = 10
+                    RandomBtn.Font = Enum.Font.GothamBold
+                    RandomBtn.Parent = SubActionBar
+                    Instance.new("UICorner", RandomBtn).CornerRadius = UDim.new(0, 4)
+
+                    local UnequipBtn = Instance.new("TextButton")
+                    UnequipBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    UnequipBtn.Position = UDim2.new(0.333, 0, 0, 0)
+                    UnequipBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    UnequipBtn.BorderSizePixel = 0
+                    UnequipBtn.Text = "Quit"
+                    UnequipBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    UnequipBtn.TextSize = 10
+                    UnequipBtn.Font = Enum.Font.GothamBold
+                    UnequipBtn.Parent = SubActionBar
+                    Instance.new("UICorner", UnequipBtn).CornerRadius = UDim.new(0, 4)
+
+                    local FavFilterBtn = Instance.new("TextButton")
+                    FavFilterBtn.Size = UDim2.new(0.32, -3, 1, 0)
+                    FavFilterBtn.Position = UDim2.new(0.666, 0, 0, 0)
+                    FavFilterBtn.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+                    FavFilterBtn.BorderSizePixel = 0
+                    FavFilterBtn.Text = "★ Fav"
+                    FavFilterBtn.TextColor3 = Color3.fromRGB(170, 170, 170)
+                    FavFilterBtn.TextSize = 10
+                    FavFilterBtn.Font = Enum.Font.GothamBold
+                    FavFilterBtn.Parent = SubActionBar
+                    Instance.new("UICorner", FavFilterBtn).CornerRadius = UDim.new(0, 4)
+
+                    local SearchBox = Instance.new("TextBox")
+                    SearchBox.Size = UDim2.new(1, -16, 0, 26)
+                    SearchBox.Position = UDim2.new(0, 8, 0, 64)
+                    SearchBox.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+                    SearchBox.BorderSizePixel = 0
+                    SearchBox.PlaceholderText = " Buscar cosmetic..."
+                    SearchBox.Text = ""
+                    SearchBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    SearchBox.PlaceholderColor3 = Color3.fromRGB(90, 90, 90)
+                    SearchBox.TextSize = 10
+                    SearchBox.Font = Enum.Font.Gotham
+                    SearchBox.Parent = CosmeticSection
+                    Instance.new("UICorner", SearchBox).CornerRadius = UDim.new(0, 4)
+                    local CSearchStroke = Instance.new("UIStroke")
+                    CSearchStroke.Color = Color3.fromRGB(30, 30, 30)
+                    CSearchStroke.Thickness = 1
+                    CSearchStroke.Parent = SearchBox
+
+                    local ListFrame = Instance.new("ScrollingFrame")
+                    ListFrame.Size = UDim2.new(1, -16, 1, -96)
+                    ListFrame.Position = UDim2.new(0, 8, 0, 94)
+                    ListFrame.BackgroundTransparency = 1
+                    ListFrame.BorderSizePixel = 0
+                    ListFrame.ScrollBarThickness = 3
+                    ListFrame.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 60)
+                    ListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+                    ListFrame.Parent = CosmeticSection
+
+                    local ListGrid = Instance.new("UIGridLayout")
+                    ListGrid.CellSize = UDim2.new(0, 78, 0, 78)
+                    ListGrid.CellPadding = UDim2.new(0, 8, 0, 8)
+                    ListGrid.SortOrder = Enum.SortOrder.Name
+                    ListGrid.Parent = ListFrame
+
+                    local ListPadding = Instance.new("UIPadding")
+                    ListPadding.PaddingTop = UDim.new(0, 4)
+                    ListPadding.PaddingLeft = UDim.new(0, 4)
+                    ListPadding.PaddingRight = UDim.new(0, 4)
+                    ListPadding.Parent = ListFrame
+
+                    local Notify = Instance.new("TextLabel")
+                    Notify.Size = UDim2.new(0, 220, 0, 28)
+                    Notify.Position = UDim2.new(0.5, -110, 1, -34)
+                    Notify.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+                    Notify.BorderSizePixel = 0
+                    Notify.Text = ""
+                    Notify.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    Notify.TextSize = 10
+                    Notify.Font = Enum.Font.GothamBold
+                    Notify.Visible = false
+                    Notify.Parent = MainFrameUI
+                    Instance.new("UICorner", Notify).CornerRadius = UDim.new(0, 4)
+                    local NotifyStroke = Instance.new("UIStroke")
+                    NotifyStroke.Color = Color3.fromRGB(50, 50, 50)
+                    NotifyStroke.Thickness = 1
+                    NotifyStroke.Parent = Notify
+
+                    showNotify = function(text)
+                        Notify.Text = text
+                        Notify.Visible = true
+                        task.delay(2, function()
+                            Notify.Visible = false
+                        end)
+                    end
+
+                    local function refreshCosmeticList(filter)
+                        for _, child in ipairs(ListFrame:GetChildren()) do
+                            if child:IsA("TextButton") then
+                                child:Destroy()
+                            end
+                        end
+                        
+                        local count = 0
+                        for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
+                            if isWeaponCosmetic(name, cosmetic) then
+                                local typeMatch = false
+                                local t = tostring(cosmetic.Type or ""):lower()
+                                local n = name:lower()
+                                
+                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then typeMatch = true end
+                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then typeMatch = true end
+                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then typeMatch = true end
+                                
+                                if typeMatch and (not filter or filter == "" or n:find(filter:lower())) then
+                                    if not (showOnlyFavorites and not favorites[name]) then
+                                        count += 1
+                                        local btn = Instance.new("TextButton")
+                                        btn.Size = UDim2.new(0, 78, 0, 78)
+                                        btn.BackgroundColor3 = Color3.fromRGB(12, 12, 12)
+                                        btn.BorderSizePixel = 0
+                                        btn.Text = ""
+                                        btn.AutoButtonColor = false
+                                        btn.Parent = ListFrame
+                                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                                        local btnStroke = Instance.new("UIStroke")
+                                        btnStroke.Color = Color3.fromRGB(25, 25, 25)
+                                        btnStroke.Thickness = 1
+                                        btnStroke.Parent = btn
+                                        
+                                        local imgId = getAssetImage(name, false)
+                                        local icon = Instance.new("ImageLabel")
+                                        icon.Size = UDim2.new(1, -10, 1, -10)
+                                        icon.Position = UDim2.new(0, 5, 0, 5)
+                                        icon.BackgroundTransparency = 1
+                                        icon.Image = imgId
+                                        icon.ScaleType = Enum.ScaleType.Fit
+                                        icon.Parent = btn
+                                        
+                                        local nameLabel = Instance.new("TextLabel")
+                                        nameLabel.Size = UDim2.new(1, -4, 0, 12)
+                                        nameLabel.Position = UDim2.new(0, 2, 1, -14)
+                                        nameLabel.BackgroundTransparency = 1
+                                        nameLabel.Text = name
+                                        nameLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
+                                        nameLabel.TextSize = 8
+                                        nameLabel.Font = Enum.Font.GothamBold
+                                        nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                                        nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+                                        nameLabel.Parent = btn
+                                        
+                                        local star = Instance.new("TextButton")
+                                        star.Size = UDim2.new(0, 18, 0, 18)
+                                        star.Position = UDim2.new(1, -20, 0, 2)
+                                        star.BackgroundTransparency = 1
+                                        star.Text = (favorites[name] and "★") or "☆"
+                                        star.TextColor3 = (favorites[name] and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(100, 100, 100)
+                                        star.TextSize = 12
+                                        star.Font = Enum.Font.GothamBold
+                                        star.Parent = btn
+                                        
+                                        star.MouseButton1Click:Connect(function()
+                                            favorites[name] = not favorites[name]
+                                            if not favorites[name] then
+                                                favorites[name] = nil
+                                            end
+                                            star.Text = (favorites[name] and "★") or "☆"
+                                            star.TextColor3 = (favorites[name] and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(100, 100, 100)
+                                            saveConfig()
+                                        end)
+                                        
+                                        btn.MouseEnter:Connect(function()
+                                            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+                                            TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(60, 60, 60)}):Play()
+                                        end)
+                                        btn.MouseLeave:Connect(function()
+                                            TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                            TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(25, 25, 25)}):Play()
+                                        end)
+                                        btn.MouseButton1Click:Connect(function()
+                                            equipCosmetic(name, currentCategory)
+                                            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(0, 120, 60)}):Play()
+                                            task.wait(0.35)
+                                            TweenService:Create(btn, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                        end)
+                                    end
+                                end
+                            end
+                        end
+                        local rows = math.ceil(count / 8)
+                        ListFrame.CanvasSize = UDim2.new(0, 0, 0, (rows * 86) + 8)
+                    end
+
+                    local function refreshWeaponList(filter)
+                        for _, child in ipairs(WeaponList:GetChildren()) do
+                            if child:IsA("TextButton") then
+                                child:Destroy()
+                            end
+                        end
+                        
+                        local weapons = WEAPON_CATEGORIES[currentWeaponTab] or {}
+                        local count = 0
+                        for _, weaponName in ipairs(weapons) do
+                            if not filter or filter == "" or weaponName:lower():find(filter:lower()) then
+                                count += 1
+                                
+                                local btn = Instance.new("TextButton")
+                                btn.Size = UDim2.new(0, 78, 0, 78)
+                                btn.BackgroundColor3 = (selectedWeapon == weaponName and Color3.fromRGB(25, 35, 45)) or Color3.fromRGB(12, 12, 12)
+                                btn.BorderSizePixel = 0
+                                btn.Text = ""
+                                btn.AutoButtonColor = false
+                                btn.Parent = WeaponList
+                                Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                                local btnStroke = Instance.new("UIStroke")
+                                btnStroke.Color = (selectedWeapon == weaponName and Color3.fromRGB(0, 150, 255)) or Color3.fromRGB(25, 25, 25)
+                                btnStroke.Thickness = 1
+                                btnStroke.Parent = btn
+                                
+                                local imgId = getAssetImage(weaponName, true)
+                                local icon = Instance.new("ImageLabel")
+                                icon.Size = UDim2.new(1, -10, 1, -10)
+                                icon.Position = UDim2.new(0, 5, 0, 5)
+                                icon.BackgroundTransparency = 1
+                                icon.Image = imgId
+                                icon.ScaleType = Enum.ScaleType.Fit
+                                icon.Parent = btn
+                                
+                                local nameLabel = Instance.new("TextLabel")
+                                nameLabel.Size = UDim2.new(1, -4, 0, 12)
+                                nameLabel.Position = UDim2.new(0, 2, 1, -14)
+                                nameLabel.BackgroundTransparency = 1
+                                nameLabel.Text = weaponName
+                                nameLabel.TextColor3 = Color3.fromRGB(170, 170, 170)
+                                nameLabel.TextSize = 8
+                                nameLabel.Font = Enum.Font.GothamBold
+                                nameLabel.TextTruncate = Enum.TextTruncate.AtEnd
+                                nameLabel.TextXAlignment = Enum.TextXAlignment.Center
+                                nameLabel.Parent = btn
+                                
+                                btn.MouseEnter:Connect(function()
+                                    if selectedWeapon ~= weaponName then
+                                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(25, 25, 25)}):Play()
+                                        TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(60, 60, 60)}):Play()
+                                    end
+                                end)
+                                btn.MouseLeave:Connect(function()
+                                    if selectedWeapon ~= weaponName then
+                                        TweenService:Create(btn, TweenInfo.new(0.12), {BackgroundColor3 = Color3.fromRGB(12, 12, 12)}):Play()
+                                        TweenService:Create(btnStroke, TweenInfo.new(0.12), {Color = Color3.fromRGB(25, 25, 25)}):Play()
+                                    end
+                                end)
+                                btn.MouseButton1Click:Connect(function()
+                                    selectedWeapon = weaponName
+                                    refreshWeaponList(WeaponSearch.Text)
+                                    refreshCosmeticList(SearchBox.Text)
+                                end)
+                            end
+                        end
+                        local rows = math.ceil(count / 8)
+                        WeaponList.CanvasSize = UDim2.new(0, 0, 0, (rows * 86) + 8)
+                    end
+
+                    for tabName, btn in pairs(tabButtons) do
+                        btn.MouseButton1Click:Connect(function()
+                            currentWeaponTab = tabName
+                            for name, b in pairs(tabButtons) do
+                                b.TextColor3 = (name == tabName and Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(170, 170, 170)
+                                b.BackgroundColor3 = (name == tabName and Color3.fromRGB(25, 25, 25)) or Color3.fromRGB(15, 15, 15)
+                            end
+                            refreshWeaponList(WeaponSearch.Text)
+                        end)
+                    end
+
+                    tabButtons["Primary"].TextColor3 = Color3.fromRGB(255, 255, 255)
+                    tabButtons["Primary"].BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+                    for cat, btn in pairs(categoryButtons) do
+                        btn.MouseButton1Click:Connect(function()
+                            currentCategory = cat
+                            for c, b in pairs(categoryButtons) do
+                                b.TextColor3 = (c == cat and Color3.fromRGB(255, 255, 255)) or Color3.fromRGB(170, 170, 170)
+                                b.BackgroundColor3 = (c == cat and Color3.fromRGB(25, 25, 25)) or Color3.fromRGB(15, 15, 15)
+                            end
+                            refreshCosmeticList(SearchBox.Text)
+                        end)
+                    end
+
+                    categoryButtons["Skin"].TextColor3 = Color3.fromRGB(255, 255, 255)
+                    categoryButtons["Skin"].BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+
+                    RandomBtn.MouseButton1Click:Connect(randomSkin)
+                    UnequipBtn.MouseButton1Click:Connect(unequipCurrent)
+
+                    FavFilterBtn.MouseButton1Click:Connect(function()
+                        showOnlyFavorites = not showOnlyFavorites
+                        FavFilterBtn.TextColor3 = (showOnlyFavorites and Color3.fromRGB(255, 200, 50)) or Color3.fromRGB(170, 170, 170)
+                        refreshCosmeticList(SearchBox.Text)
+                    end)
+
+                    SearchBox:GetPropertyChangedSignal("Text"):Connect(function()
+                        refreshCosmeticList(SearchBox.Text)
+                    end)
+
+                    WeaponSearch:GetPropertyChangedSignal("Text"):Connect(function()
+                        refreshWeaponList(WeaponSearch.Text)
+                    end)
+
+                    MinimizeBtn.MouseButton1Click:Connect(function()
+                        MainFrameUI.Visible = false
+                    end)
+
+                    local dragging = false
+                    local dragStart, startPos
+
+                    TitleBar.InputBegan:Connect(function(input)
+                        if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+                            dragging = true
+                            dragStart = input.Position
+                            startPos = MainFrameUI.Position
+                            input.Changed:Connect(function()
+                                if input.UserInputState == Enum.UserInputState.End then
+                                    dragging = false
+                                end
+                            end)
+                        end
+                    end)
+
+                    UserInputService.InputChanged:Connect(function(input)
+                        if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+                            local delta = input.Position - dragStart
+                            MainFrameUI.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+                        end
+                    end)
+
+                    loadConfig()
+                    local defaultWeapons = WEAPON_CATEGORIES["Primary"]
+                    if defaultWeapons and #defaultWeapons > 0 then
+                        selectedWeapon = defaultWeapons[1]
+                    end
+                    refreshWeaponList("")
+                    refreshCosmeticList("")
+                end)
+            elseif cosmeticInstance then
+                cosmeticInstance.Enabled = true
+            end
+            Library:Notify("Cosmetic Changer activado", 3)
+        else
+            if cosmeticInstance then
+                cosmeticInstance.Enabled = false
+            end
+            Library:Notify("Cosmetic Changer desactivado", 3)
+        end
+    end
+})
+
+local WorldGroup = Tabs["Visuals"]:AddRightGroupbox("World")
+
+WorldGroup:AddToggle("WorldBloom", {
+    Text = "Bloom",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local bloom = Lighting:FindFirstChildOfClass("BloomEffect") or Instance.new("BloomEffect")
+            bloom.Intensity = 0.8
+            bloom.Size = 24
+            bloom.Threshold = 0.9
+            bloom.Parent = Lighting
+        else
+            local bloom = Lighting:FindFirstChildOfClass("BloomEffect")
+            if bloom then bloom:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddToggle("WorldAtmosphere", {
+    Text = "Atmosphere",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local atm = Lighting:FindFirstChildOfClass("Atmosphere") or Instance.new("Atmosphere")
+            atm.Density = 0.3
+            atm.Offset = 0.25
+            atm.Color = Color3.fromRGB(100, 150, 200)
+            atm.Decay = Color3.fromRGB(50, 50, 80)
+            atm.Glare = 0.2
+            atm.Haze = 1.5
+            atm.Parent = Lighting
+        else
+            local atm = Lighting:FindFirstChildOfClass("Atmosphere")
+            if atm then atm:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddToggle("WorldColorCorrection", {
+    Text = "Color Correction",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect") or Instance.new("ColorCorrectionEffect")
+            cc.Brightness = 0.05
+            cc.Contrast = 0.15
+            cc.Saturation = 0.2
+            cc.TintColor = Color3.fromRGB(255, 240, 230)
+            cc.Parent = Lighting
+        else
+            local cc = Lighting:FindFirstChildOfClass("ColorCorrectionEffect")
+            if cc then cc:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddToggle("WorldSunRays", {
+    Text = "Sun Rays",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local sr = Lighting:FindFirstChildOfClass("SunRaysEffect") or Instance.new("SunRaysEffect")
+            sr.Intensity = 0.15
+            sr.Spread = 0.6
+            sr.Parent = Lighting
+        else
+            local sr = Lighting:FindFirstChildOfClass("SunRaysEffect")
+            if sr then sr:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddToggle("WorldDepthOfField", {
+    Text = "Depth Of Field",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect") or Instance.new("DepthOfFieldEffect")
+            dof.FarIntensity = 0.3
+            dof.FocusDistance = 50
+            dof.InFocusRadius = 30
+            dof.NearIntensity = 0.2
+            dof.Parent = Lighting
+        else
+            local dof = Lighting:FindFirstChildOfClass("DepthOfFieldEffect")
+            if dof then dof:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddToggle("WorldBlur", {
+    Text = "Blur",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            local blur = Lighting:FindFirstChildOfClass("BlurEffect") or Instance.new("BlurEffect")
+            blur.Size = 8
+            blur.Parent = Lighting
+        else
+            local blur = Lighting:FindFirstChildOfClass("BlurEffect")
+            if blur then blur:Destroy() end
+        end
+    end
+})
+
+WorldGroup:AddSlider("WorldBrightness", {
+    Text = "Brightness",
+    Default = 2,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        Lighting.Brightness = Value
+    end
+})
+
+WorldGroup:AddSlider("WorldClockTime", {
+    Text = "Clock Time",
+    Default = 14,
+    Min = 0,
+    Max = 24,
+    Rounding = 1,
+    Callback = function(Value)
+        Lighting.ClockTime = Value
+    end
+})
+
+WorldGroup:AddSlider("WorldFogStart", {
+    Text = "Fog Start",
+    Default = 0,
+    Min = 0,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(Value)
+        Lighting.FogStart = Value
+    end
+})
+
+WorldGroup:AddSlider("WorldFogEnd", {
+    Text = "Fog End",
+    Default = 1000,
+    Min = 100,
+    Max = 5000,
+    Rounding = 0,
+    Callback = function(Value)
+        Lighting.FogEnd = Value
+    end
+})
+
+WorldGroup:AddSlider("WorldExposure", {
+    Text = "Exposure Compensation",
+    Default = 0,
+    Min = -5,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        Lighting.ExposureCompensation = Value
+    end
+})
+
+WorldGroup:AddToggle("WorldGlobalShadows", {
+    Text = "Global Shadows",
+    Default = true,
+    Callback = function(Value)
+        Lighting.GlobalShadows = Value
+    end
+})
+
+local MiscLeft = Tabs["Misc"]:AddLeftGroupbox("Player")
+
+MiscLeft:AddToggle("MiscInfiniteJump", {
+    Text = "Infinite Jump",
+    Default = false,
+    Callback = function(Value)
+        getgenv().InfiniteJump = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscNoclip", {
+    Text = "Noclip",
+    Default = false,
+    Callback = function(Value)
+        getgenv().Noclip = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAntiAFK", {
+    Text = "Anti AFK",
+    Default = true,
+    Callback = function(Value)
+        getgenv().AntiAFK = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscGodMode", {
+    Text = "Client Godmode",
+    Default = false,
+    Callback = function(Value)
+        getgenv().GodMode = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAutoRespawn", {
+    Text = "Auto Respawn",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoRespawn = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAntiSit", {
+    Text = "Anti Sit",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AntiSit = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscAntiRagdoll", {
+    Text = "Anti Ragdoll",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AntiRagdoll = Value
+    end
+})
+
+MiscLeft:AddToggle("MiscNoFallDamage", {
+    Text = "No Fall Damage",
+    Default = false,
+    Callback = function(Value)
+        getgenv().NoFallDamage = Value
+    end
+})
+
+MiscLeft:AddToggle("SpinbotEnabled", {
+    Text = "Spinbot",
+    Default = false,
+    Callback = function(Value)
+        SpinbotEnabled = Value
+    end
+})
+
+MiscLeft:AddSlider("SpinbotSpeed", {
+    Text = "Spinbot Speed",
+    Default = 500,
+    Min = 50,
+    Max = 50000,
+    Rounding = 0,
+    Callback = function(Value)
+        SpinbotSpeed = Value
+    end
+})
+
+MiscLeft:AddSlider("MiscSpeedBoost", {
+    Text = "SpeedBoost",
+    Default = 50,
+    Min = 50,
+    Max = 1000,
+    Rounding = 0,
+    Callback = function(Value)
+        MiscSpeedBoost = Value
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").WalkSpeed = Value
+        end
+    end
+})
+
+MiscLeft:AddSlider("MiscJumpPower", {
+    Text = "JumpPower",
+    Default = 50,
+    Min = 0,
+    Max = 300,
+    Rounding = 0,
+    Callback = function(Value)
+        MiscJumpPower = Value
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").JumpPower = Value
+        end
+    end
+})
+
+MiscLeft:AddSlider("MiscHipHeight", {
+    Text = "Hip Height",
+    Default = 2,
+    Min = -5,
+    Max = 20,
+    Rounding = 1,
+    Callback = function(Value)
+        MiscHipHeight = Value
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            char:FindFirstChildOfClass("Humanoid").HipHeight = Value
+        end
+    end
+})
+
+MiscLeft:AddSlider("MiscFOV", {
+    Text = "FOV",
+    Default = 70,
+    Min = 30,
+    Max = 120,
+    Rounding = 0,
+    Callback = function(Value)
+        MiscFOV = Value
+        Camera.FieldOfView = Value
+    end
+})
+
+local MiscRight = Tabs["Misc"]:AddRightGroupbox("Anti-Aim & Underground")
+
+MiscRight:AddToggle("AntiAimToggle", {
+    Text = "ENABLED ANTI-AIM",
+    Default = false,
+    Callback = function(Value)
+        AntiAimEnabled = Value
+    end
+})
+
+MiscRight:AddDropdown("AntiAimModeDropdown", {
+    Values = {"Spin", "Jitter", "Zero", "Custom"},
+    Default = 1,
+    Multi = false,
+    Text = "Anti-Aim Mode",
+    Callback = function(Value)
+        AntiAimMode = Value
+    end
+})
+
+MiscRight:AddSlider("AntiAimSpeedSlider", {
+    Text = "Anti-Aim Speed",
+    Default = 500,
+    Min = 50,
+    Max = 2000,
+    Rounding = 0,
+    Callback = function(Value)
+        AntiAimSpeed = Value
+    end
+})
+
+MiscRight:AddSlider("AntiAimIntensitySlider", {
+    Text = "Anti-Aim Intensity",
+    Default = 5,
+    Min = 1,
+    Max = 20,
+    Rounding = 1,
+    Callback = function(Value)
+        AntiAimIntensity = Value
+    end
+})
+
+MiscRight:AddSlider("CameraShakeSlider", {
+    Text = "Camera Shake Intensity",
+    Default = 2,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(Value)
+        CameraShakeIntensity = Value
+    end
+})
+
+MiscRight:AddToggle("MiscUndergroundToggle", {
+    Text = "Underground (Custom Code)",
+    Default = false,
+    Callback = function(Value)
+        MiscUndergroundEnabled = Value
+    end
+})
+
+local UtilityRight = Tabs["Misc"]:AddRightGroupbox("Utility")
+
+UtilityRight:AddButton("Reset Character", function()
+    local char = LocalPlayer.Character
+    if char and char:FindFirstChildOfClass("Humanoid") then
+        char:FindFirstChildOfClass("Humanoid").Health = 0
+    end
+end)
+
+UtilityRight:AddButton("Rejoin", function()
+    TeleportService:Teleport(game.PlaceId, LocalPlayer)
+end)
+
+UtilityRight:AddButton("Server Hop", function()
+    local servers = {}
+    local req = game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
+    local data = game:GetService("HttpService"):JSONDecode(req)
+    for _, v in pairs(data.data) do
+        if v.playing < v.maxPlayers and v.id ~= game.JobId then
+            table.insert(servers, v.id)
+        end
+    end
+    if #servers > 0 then
+        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
+    end
+end)
+
+UtilityRight:AddButton("Copy JobId", function()
+    setclipboard(game.JobId)
+    Library:Notify("JobId copiado", 3)
+end)
+
+UtilityRight:AddButton("Copy PlaceId", function()
+    setclipboard(tostring(game.PlaceId))
+    Library:Notify("PlaceId copiado", 3)
+end)
+
+UtilityRight:AddButton("Copy Game Invite", function()
+    setclipboard("roblox://placeId=" .. game.PlaceId)
+    Library:Notify("Invite copiado", 3)
+end)
+
+UtilityRight:AddToggle("MiscFullbright", {
+    Text = "Fullbright",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            Lighting.Brightness = 2
+            Lighting.ClockTime = 14
+            Lighting.FogEnd = 100000
+            Lighting.GlobalShadows = false
+            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        end
+    end
+})
+
+UtilityRight:AddToggle("MiscRemoveFog", {
+    Text = "Remove Fog",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            Lighting.FogEnd = 100000
+            Lighting.FogStart = 0
+        end
+    end
+})
+
+UtilityRight:AddToggle("MiscNoTextures", {
+    Text = "Remove Textures",
+    Default = false,
+    Callback = function(Value)
+        getgenv().NoTextures = Value
+        if Value then
+            for _, v in pairs(workspace:GetDescendants()) do
+                if v:IsA("Texture") or v:IsA("Decal") then
+                    v.Transparency = 1
+                end
+            end
+        end
+    end
+})
+
+UtilityRight:AddToggle("MiscZoomUnlock", {
+    Text = "Unlock Zoom",
+    Default = false,
+    Callback = function(Value)
+        if Value then
+            LocalPlayer.CameraMaxZoomDistance = 9999
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        else
+            LocalPlayer.CameraMaxZoomDistance = 128
+            LocalPlayer.CameraMinZoomDistance = 0.5
+        end
+    end
+})
+
+UtilityRight:AddToggle("MiscShowFPS", {
+    Text = "Show FPS",
+    Default = false,
+    Callback = function(Value)
+        getgenv().ShowFPS = Value
+    end
+})
+
+UtilityRight:AddToggle("MiscShowPing", {
+    Text = "Show Ping",
+    Default = false,
+    Callback = function(Value)
+        getgenv().ShowPing = Value
+    end
+})
+
+local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings")
+
+MenuGroup:AddToggle("KeybindMenuOpen", {
+    Default = Library.KeybindFrame.Visible,
+    Text = "Open Keybind Menu",
+    Callback = function(v) 
+        Library.KeybindFrame.Visible = v 
+    end
+})
+
+MenuGroup:AddLabel("Menu bind"):AddKeyPicker("MenuKeybind", {
+    Default = "RightShift",
+    NoUI = true,
+    Text = "Menu keybind"
+})
+
+MenuGroup:AddButton("Unload", function()
+    Library:Unload()
+end)
+
+Library.ToggleKeybind = Options.MenuKeybind
+
+ThemeManager:SetLibrary(Library)
+SaveManager:SetLibrary(Library)
+
+SaveManager:IgnoreThemeSettings()
+SaveManager:SetIgnoreIndexes({"MenuKeybind"})
+
+ThemeManager:SetFolder("ApocalypseHub")
+SaveManager:SetFolder("ApocalypseHub/configs")
+
+SaveManager:BuildConfigSection(Tabs["UI Settings"])
+ThemeManager:ApplyToTab(Tabs["UI Settings"])
+
+pcall(function() 
+    SaveManager:LoadAutoloadConfig() 
+end)
+
+Library:Notify("THANKS FOR USING APOCALYPSE HUB", 5)
+
+local function isEnemy(player)
+    if player == LocalPlayer then return false end
+    if not ESPTeamCheck then return true end
+    if SpectateController then
+        local success, duel = pcall(function() return SpectateController.CurrentDuelSubject end)
+        if success and duel then
+            local localDueler = duel:GetDueler(LocalPlayer)
+            local localTeam = localDueler and localDueler:Get("TeamID") or nil
+            if localTeam and duel.Duelers then
+                for _, dueler in ipairs(duel.Duelers) do
+                    if dueler.Player == player then
+                        local team = dueler:Get("TeamID")
+                        return team ~= localTeam
+                    end
+                end
+            end
+        end
+    end
+    local pTeam = player:GetAttribute("TeamID")
+    local lTeam = LocalPlayer:GetAttribute("TeamID")
+    if pTeam and lTeam then
+        return pTeam ~= lTeam
+    end
+    return true
+end
+
+local function isTargetValid(player)
+    if not player or not isEnemy(player) then return false end
+    local pChar = player.Character
+    if not pChar then return false end
+    local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+    local pHead = pChar:FindFirstChild("Head")
+    local pHum = pChar:FindFirstChildWhichIsA("Humanoid")
+    if not (pRoot and pHead and pHum and pHum.Health > 0) then return false end
+    return true
+end
+
+local function hasValidWeaponAndObjectID()
+    if not FighterController or not FighterController.LocalFighter then return false end
+    local item = FighterController.LocalFighter.EquippedItem
+    if not item then return false end
+    local success, objId = pcall(function() return item:Get("ObjectID") end)
+    if not success or not objId then return false end
+    return true
+end
+
+local function getClosestTarget(maxDistance)
+    maxDistance = maxDistance or math.huge
+    local char = LocalPlayer.Character
+    if not char then return nil, nil, nil end
+    local myRoot = char:FindFirstChild("HumanoidRootPart")
+    if not myRoot then return nil, nil, nil end
+
+    local bestPlayer, bestRoot, bestHead = nil, nil, nil
+    local bestScore = math.huge
+
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if isTargetValid(player) then
+            local pChar = player.Character
+            local pRoot = pChar:FindFirstChild("HumanoidRootPart")
+            local pHead = pChar:FindFirstChild("Head")
+            local pHum = pChar:FindFirstChildWhichIsA("Humanoid")
+
+            if pRoot and pHead and pHum then
+                local dist = (myRoot.Position - pRoot.Position).Magnitude
+                if dist <= maxDistance then
+                    local score = dist
+
+                    if isRagebotOn and AutoPrioritized then
+                        if PriorityMode == "VALUE (HP)" then
+                            score = pHum.Health
+                        elseif PriorityMode == "CHARACTER" then
+                            local history = playerVelocityHistory[player]
+                            local currentVel = pRoot.AssemblyLinearVelocity
+                            local strangeScore = dist
+
+                            if history then
+                                local speedDiff = (currentVel - history.lastVelocity).Magnitude
+                                local directionChange = 0
+                                if history.lastVelocity.Magnitude > 5 then
+                                    directionChange = (1 - currentVel.Unit:Dot(history.lastVelocity.Unit)) * 50
+                                end
+                                if speedDiff > 40 or directionChange > 25 then
+                                    strangeScore = dist * 0.3
+                                end
+                            end
+                            score = strangeScore
+                            playerVelocityHistory[player] = {
+                                lastVelocity = currentVel,
+                                lastPosition = pRoot.Position
+                            }
+                        end
+                    end
+
+                    if score < bestScore then
+                        bestScore = score
+                        bestPlayer = player
+                        bestRoot = pRoot
+                        bestHead = pHead
+                    end
+                end
+            end
+        end
+    end
+
+    if bestPlayer and bestPlayer ~= lastPrioritizedPlayer and isRagebotOn and AutoPrioritized and PriorityMode ~= "Closest" then
+        if tick() - lastNotifyTime > 1.2 then
+            lastNotifyTime = tick()
+            lastPrioritizedPlayer = bestPlayer
+            if PriorityMode == "VALUE (HP)" then
+                local hp = math.floor(bestPlayer.Character:FindFirstChildWhichIsA("Humanoid").Health)
+                Library:Notify("AUTO PRIORIZED (" .. hp .. " HP) - Low Health", 3)
+            elseif PriorityMode == "CHARACTER" then
+                Library:Notify("AUTO PRIORIZED (" .. bestPlayer.Name .. ")", 3)
+            end
+        end
+    elseif not bestPlayer then
+        lastPrioritizedPlayer = nil
+    end
+
+    return bestPlayer, bestRoot, bestHead
+end
+
+local function bringAllToMe()
+    local character = LocalPlayer.Character
+    if not character then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+
+    local targetCFrame = rootPart.CFrame
+
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if player ~= LocalPlayer then
+            local enemyChar = player.Character
+            if enemyChar then
+                local enemyRoot = enemyChar:FindFirstChild("HumanoidRootPart")
+                if enemyRoot then
+                    for _, part in ipairs(enemyChar:GetDescendants()) do
+                        if part:IsA("BasePart") then
+                            part.CanCollide = false
+                        end
+                    end
+                    enemyRoot.CFrame = targetCFrame
+                end
+            end
+        end
+    end
+end
+
+local function createDrawing(class, props)
+    local d = Drawing.new(class)
+    for k, v in pairs(props or {}) do
+        d[k] = v
+    end
+    return d
+end
+
+local function removeDrawings(player)
+    if Drawings[player] then
+        for _, d in pairs(Drawings[player]) do
+            pcall(function() d:Remove() end)
+        end
+        Drawings[player] = nil
+    end
+    if Highlights[player] then
+        pcall(function() Highlights[player]:Destroy() end)
+        Highlights[player] = nil
+    end
+end
+
+local function updateESP()
+    if not ESPEnabled then
+        for player, _ in pairs(Drawings) do
+            removeDrawings(player)
+        end
+        return
+    end
+
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
+
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if player == LocalPlayer then
+            removeDrawings(player)
+            continue
+        end
+
+        if not isTargetValid(player) then
+            removeDrawings(player)
+            continue
+        end
+
+        local char = player.Character
+        local root = char:FindFirstChild("HumanoidRootPart")
+        local head = char:FindFirstChild("Head")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+
+        if not root or not head or not humanoid then
+            removeDrawings(player)
+            continue
+        end
+
+        local dist = myRoot and (myRoot.Position - root.Position).Magnitude or 0
+        if dist > ESPMaxDistance then
+            removeDrawings(player)
+            continue
+        end
+
+        local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+
+        if not Drawings[player] then
+            Drawings[player] = {
+                Box = createDrawing("Square", {Thickness = 1, Filled = false, Color = ESPBoxColor, Visible = false}),
+                Name = createDrawing("Text", {Size = 14, Center = true, Outline = true, Color = ESPNameColor, Visible = false}),
+                Distance = createDrawing("Text", {Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(200, 200, 200), Visible = false}),
+                Health = createDrawing("Line", {Thickness = 2, Color = Color3.fromRGB(0, 255, 0), Visible = false}),
+                Tracer = createDrawing("Line", {Thickness = 1, Color = ESPTracerColor, Visible = false}),
+                HeadDot = createDrawing("Circle", {Thickness = 1, Filled = true, Color = Color3.fromRGB(255, 0, 0), Visible = false, Radius = 4}),
+                Arrow = createDrawing("Triangle", {Thickness = 1, Filled = true, Color = Color3.fromRGB(0, 255, 128), Visible = false}),
+            }
+        end
+
+        local d = Drawings[player]
+        local size = char:GetExtentsSize()
+        local scale = (size.Y * Camera.ViewportSize.Y) / (dist * 2) * 0.4
+        local boxW, boxH = scale * 0.6, scale
+
+        if onScreen then
+            if ESPBox then
+                d.Box.Size = Vector2.new(boxW, boxH)
+                d.Box.Position = Vector2.new(pos.X - boxW/2, pos.Y - boxH/2)
+                d.Box.Visible = true
+            else
+                d.Box.Visible = false
+            end
+
+            if ESPName then
+                d.Name.Text = player.Name
+                d.Name.Position = Vector2.new(pos.X, pos.Y + boxH/2 - 16)
+                d.Name.Visible = true
+            else
+                d.Name.Visible = false
+            end
+
+            if ESPDistance then
+                d.Distance.Text = math.floor(dist) .. " studs"
+                d.Distance.Position = Vector2.new(pos.X, pos.Y + boxH/2 + 2)
+                d.Distance.Visible = true
+            else
+                d.Distance.Visible = false
+            end
+
+            if ESPHealth then
+                local hp = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                d.Health.From = Vector2.new(pos.X - boxW/2 - 5, pos.Y + boxH/2)
+                d.Health.To = Vector2.new(pos.X - boxW/2 - 5, pos.Y + boxH/2 - (boxH * hp))
+                d.Health.Color = Color3.fromRGB(255 - (hp * 255), hp * 255, 0)
+                d.Health.Visible = true
+            else
+                d.Health.Visible = false
+            end
+
+            if ESPTracer then
+                d.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                d.Tracer.To = Vector2.new(pos.X, pos.Y + boxH/2)
+                d.Tracer.Visible = true
+            else
+                d.Tracer.Visible = false
+            end
+
+            if ESPHeadDot and headOnScreen then
+                d.HeadDot.Position = Vector2.new(headPos.X, headPos.Y)
+                d.HeadDot.Visible = true
+            else
+                d.HeadDot.Visible = false
+            end
+
+            d.Arrow.Visible = false
+        else
+            d.Box.Visible = false
+            d.Name.Visible = false
+            d.Distance.Visible = false
+            d.Health.Visible = false
+            d.Tracer.Visible = false
+            d.HeadDot.Visible = false
+
+            if ESPOffscreenArrows then
+                local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                local dir = Vector2.new(pos.X - screenCenter.X, pos.Y - screenCenter.Y).Unit
+                local arrowPos = screenCenter + dir * 200
+                d.Arrow.PointA = arrowPos
+                d.Arrow.PointB = arrowPos - dir * 15 + Vector2.new(-dir.Y, dir.X) * 8
+                d.Arrow.PointC = arrowPos - dir * 15 + Vector2.new(dir.Y, -dir.X) * 8
+                d.Arrow.Visible = true
+            else
+                d.Arrow.Visible = false
+            end
+        end
+
+        if ESPChams then
+            if not Highlights[player] then
+                local highlight = Instance.new("Highlight")
+                highlight.FillColor = Color3.fromRGB(0, 255, 128)
+                highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
+                highlight.FillTransparency = 0.5
+                highlight.OutlineTransparency = 0
+                highlight.Adornee = char
+                highlight.Parent = CoreGui
+                Highlights[player] = highlight
+            else
+                Highlights[player].Adornee = char
+            end
+        else
+            if Highlights[player] then
+                Highlights[player]:Destroy()
+                Highlights[player] = nil
+            end
+        end
+    end
+end
+
+RunService.Heartbeat:Connect(function()
+    if isRagebotOn and isManipulacionOn then
+        bringAllToMe()
+    end
+end)
+
+-- Underground Manipulation
+RunService.Stepped:Connect(function()
+    if not isRagebotOn or not UndergroundManipulationEnabled then 
+        undergroundAnchorPos = nil
+        return 
+    end
+    
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+
+    if not undergroundAnchorPos or (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(undergroundAnchorPos.X, 0, undergroundAnchorPos.Z)).Magnitude > 50 then
+        undergroundAnchorPos = hrp.Position
+    end
+
+    if tick() - undergroundTimer >= 0 then
+        undergroundTimer = tick()
+        local randomX = math.random(-35, 35)
+        local randomZ = math.random(-35, 35)
+        currentUndergroundOffset = Vector3.new(randomX, -5, randomZ)
+    end
+
+    local targetPos = undergroundAnchorPos + currentUndergroundOffset
+    hrp.CFrame = CFrame.new(targetPos) * (hrp.CFrame - hrp.CFrame.Position)
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+end)
+
+-- INTEGRACIÓN DE UNDERGROUND SOLICITADO
+RunService.Stepped:Connect(function()
+    if not MiscUndergroundEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local targetCFrame = hrp.CFrame - Vector3.new(0, 5, 0)
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            part.CanCollide = false
+        end
+    end
+    hrp.CFrame = targetCFrame
+    hrp.AssemblyLinearVelocity = Vector3.zero
+    hrp.AssemblyAngularVelocity = Vector3.zero
+end)
+
+RunService.RenderStepped:Connect(function()
+    updateESP()
+
+    local char = LocalPlayer.Character
+    if char then
+        local hum = char:FindFirstChildOfClass("Humanoid")
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+
+        if hum then
+            if getgenv().GodMode then
+                hum.MaxHealth = math.huge
+                hum.Health = math.huge
+            end
+            hum.WalkSpeed = MiscSpeedBoost
+            if MiscJumpPower ~= 50 then
+                hum.JumpPower = MiscJumpPower
+            end
+            if MiscHipHeight ~= 2 then
+                hum.HipHeight = MiscHipHeight
+            end
+            if getgenv().AntiSit then
+                hum.Sit = false
+            end
+        end
+
+        if getgenv().Noclip then
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+
+        if SpinbotEnabled and hrp then
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinbotSpeed * 0.05), 0)
+        end
+
+        -- LÓGICA DE ANTI-AIM Y CAMERA SHAKE DINÁMICO
+        if AntiAimEnabled and hrp then
+            if AntiAimMode == "Spin" then
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(AntiAimSpeed * 0.1), 0)
+            elseif AntiAimMode == "Jitter" then
+                local jitterOffset = (math.random() - 0.5) * AntiAimIntensity
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(jitterOffset * 45), 0)
+            elseif AntiAimMode == "Zero" then
+                hrp.CFrame = CFrame.new(hrp.Position) * CFrame.Angles(0, 0, 0)
+            elseif AntiAimMode == "Custom" then
+                hrp.CFrame = hrp.CFrame * CFrame.Angles(math.rad(AntiAimIntensity * 5), math.rad(AntiAimSpeed * 0.05), 0)
+            end
+
+            if CameraShakeIntensity > 0 then
+                local shakeX = (math.random() - 0.5) * CameraShakeIntensity * 0.2
+                local shakeY = (math.random() - 0.5) * CameraShakeIntensity * 0.2
+                Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(shakeX), math.rad(shakeY), 0)
+            end
+        end
+    end
+end)
+
+UserInputService.JumpRequest:Connect(function()
+    if getgenv().InfiniteJump and LocalPlayer.Character then
+        local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then
+            hum:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    undergroundAnchorPos = nil
+    task.wait(0.5)
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if hum then
+        hum.WalkSpeed = MiscSpeedBoost
+        hum.JumpPower = MiscJumpPower
+        hum.HipHeight = MiscHipHeight
+    end
+end)
+
+spawn(function()
+    while task.wait(30) do
+        if getgenv().AntiAFK ~= false then
+            pcall(function()
+                local vu = game:GetService("VirtualUser")
+                vu:CaptureController()
+                vu:ClickButton2(Vector2.new())
+            end)
+        end
+    end
+end)
+
+spawn(function()
+    while task.wait(1) do
+        if getgenv().AutoRespawn then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChildOfClass("Humanoid") and char:FindFirstChildOfClass("Humanoid").Health <= 0 then
+                task.wait(0.3)
+                LocalPlayer:LoadCharacter()
+            end
+        end
+    end
+end)
+
+-- UE COUNTER PURO
+RunService.RenderStepped:Connect(function()
+    if not isUEKillersOn then return end
+    
+    if not hasValidWeaponAndObjectID() then return end
+    
+    local hasValidEnemy = false
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if isTargetValid(player) then
+            hasValidEnemy = true
+            break
+        end
+    end
+    if not hasValidEnemy then return end
+
+    local character = LocalPlayer.Character
+    if not character then return end
+    
+    local hrp = character:FindFirstChild("HumanoidRootPart")
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    
+    if ueAutoEquip and FighterController and FighterController.LocalFighter then
+        pcall(function()
+            FighterController.LocalFighter:EquipItem(getSlotNumber())
+        end)
+    end
+    
+    if hrp then
+        hrp.Velocity = Vector3.new(0, currentSpeed, 0)
+        
+        if ueNoCollision then
+            for _, part in ipairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end
+    
+    if hrp then
+        local _, targetRoot, _ = getClosestTarget()
+        if targetRoot then
+            local dist = (targetRoot.Position - hrp.Position).Magnitude
+            if dist <= currentStuds then
+                local intensity = teleportIntensity
+                local randomX = math.random(-currentStuds, currentStuds) * intensity
+                local randomY = math.random(-verticalRange, currentStuds) * intensity
+                local randomZ = math.random(-currentStuds, currentStuds) * intensity
+                hrp.CFrame = hrp.CFrame + Vector3.new(randomX, randomY, randomZ)
+            end
+        end
+    end
+    
+    if humanoid and ueGodmode then
+        humanoid.MaxHealth = math.huge
+        humanoid.Health = math.huge
+    end
+    
+    if ueShoot and getgenv().Config.Enabled then
+        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange)
+        if targetPlayer and targetHead and targetRoot and hrp then
+            if FighterController and FighterController.LocalFighter then
+                local item = FighterController.LocalFighter.EquippedItem
+                if item and util and enum then
+                    local originPos = hrp.Position
+                    local targetPos = targetHead.Position
+                    local aimCF = CFrame.lookAt(originPos, targetPos)
+                    local targetCF = targetHead.CFrame
+
+                    local randomOffset = Vector3.new(
+                        (math.random() - 0.5) * 0.05,
+                        (math.random() - 0.5) * 0.05,
+                        (math.random() - 0.5) * 0.05
+                    )
+                    local aimedPos = targetPos + randomOffset
+                    local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+
+                    local cameradata = {}
+                    cameradata[utf8.char(1)] = {
+                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+                        [utf8.char(1)] = util:EncodeCFrame(targetCF),
+                        [utf8.char(2)] = targetHead,
+                        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+                    }
+
+                    pcall(function()
+                        repS.Remotes.Replication.Fighter.UseItem:FireServer(
+                            item:Get("ObjectID"),
+                            enum:ToEnum("StartShooting"),
+                            cameradata,
+                            nil
+                        )
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- KICIA COUNTER PURO
+RunService.RenderStepped:Connect(function()
+    if not isAxeCounterOn then 
+        lockedYPosition = nil
+        initialPosition = nil
+        return 
+    end
+
+    if not hasValidWeaponAndObjectID() then return end
+
+    local hasValidEnemy = false
+    for _, player in ipairs(plrs:GetPlayers()) do
+        if isTargetValid(player) then
+            hasValidEnemy = true
+            break
+        end
+    end
+    if not hasValidEnemy then return end
+
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then return end
+
+    if forceNoCollision then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
+            end
+        end
+    end
+
+    if not lockedYPosition or not initialPosition then
+        lockedYPosition = humanoidRootPart.Position.Y - UndergroundHeight
+        initialPosition = Vector3.new(humanoidRootPart.Position.X, lockedYPosition, humanoidRootPart.Position.Z)
+    end
+
+    local sideMove = math.sin(tick() * sideSpeed) * sideOffset
+    local rightVector = humanoidRootPart.CFrame.RightVector
+    local finalPosition = initialPosition + (rightVector * sideMove)
+
+    angle = (angle + spinSpeed) % 360
+    
+    humanoidRootPart.CFrame = CFrame.new(finalPosition) * CFrame.Angles(math.rad(90), math.rad(angle), 0)
+
+    humanoidRootPart.AssemblyLinearVelocity = Vector3.zero
+    humanoidRootPart.AssemblyAngularVelocity = Vector3.zero
+
+    if randomJoints then
+        for _, joint in ipairs(character:GetDescendants()) do
+            if joint:IsA("Motor6D") and joint.Name ~= "RootJoint" then
+                joint.C0 = joint.C0 * CFrame.Angles(
+                    math.rad(math.random(-45, 45)), 
+                    math.rad(math.random(-180, 180)), 
+                    math.rad(math.random(-45, 45))
+                )
+            end
+        end
+    end
+
+    if getgenv().Config.Enabled then
+        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange)
+        if targetPlayer and targetHead and targetRoot then
+            if FighterController and FighterController.LocalFighter then
+                local item = FighterController.LocalFighter.EquippedItem
+                if item and util and enum then
+                    local originPos = humanoidRootPart.Position
+                    local targetPos = targetHead.Position
+                    local aimCF = CFrame.lookAt(originPos, targetPos)
+                    local targetCF = targetHead.CFrame
+
+                    local randomOffset = Vector3.new(
+                        (math.random() - 0.5) * 0.1,
+                        (math.random() - 0.5) * 0.1,
+                        (math.random() - 0.5) * 0.1
+                    )
+                    local aimedPos = targetPos + randomOffset
+                    local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+
+                    local cameradata = {}
+                    cameradata[utf8.char(1)] = {
+                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+                        [utf8.char(1)] = util:EncodeCFrame(targetCF),
+                        [utf8.char(2)] = targetHead,
+                        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+                    }
+
+                    pcall(function()
+                        repS.Remotes.Replication.Fighter.UseItem:FireServer(
+                            item:Get("ObjectID"),
+                            enum:ToEnum("StartShooting"),
+                            cameradata,
+                            nil
+                        )
+                    end)
+                end
+            end
+        end
+    end
+end)
+
+-- AUTO FIRE INDEPENDIENTE
+runS.Heartbeat:Connect(function()
+    if not getgenv().Config.Enabled then return end
+    if isInVoidPhase then return end
+
+    local currentText = StatusLabel.Text
+    if not string.find(currentText, "→") then return end
+
+    local targetPlayer, targetRoot, targetHead = getClosestTarget(autoFireRange)
+    if not targetPlayer or not targetHead or not targetRoot then return end
+    
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return end
+    
+    if not FighterController or not FighterController.LocalFighter then return end
+    local item = FighterController.LocalFighter.EquippedItem
+    if not item then return end
+
+    local originPos = char.HumanoidRootPart.Position
+    local targetPos = targetHead.Position
+    local aimCF = CFrame.lookAt(originPos, targetPos)
+    local targetCF = targetHead.CFrame
+
+    local randomOffset = Vector3.new(
+        (math.random() - 0.5) * 0.1,
+        (math.random() - 0.5) * 0.1,
+        (math.random() - 0.5) * 0.1
+    )
+    local aimedPos = targetPos + randomOffset
+    local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+
+    local cameradata = {}
+    cameradata[utf8.char(1)] = {
+        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+        [utf8.char(1)] = util:EncodeCFrame(targetCF),
+        [utf8.char(2)] = targetHead,
+        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+    }
+
+    pcall(function()
+        repS.Remotes.Replication.Fighter.UseItem:FireServer(
+            item:Get("ObjectID"),
+            enum:ToEnum("StartShooting"),
+            cameradata,
+            nil
+        )
+    end)
+end)
+
+-- RAGEBOT DIRECTO Y SÚPER AGRESIVO
+task.spawn(function()
+    local lastTarget = nil
+    local lastTargetPos = nil
+
+    while true do
+        task.wait()
+
+        if Options.RagebotKeybind and Options.RagebotKeybind:GetState() then
+            isRagebotOn = true
+        end
+
+        if not isRagebotOn then
+            StatusLabel.Visible = false
+            lastTarget = nil
+            lastTargetPos = nil
+            isInVoidPhase = false
+            undergroundAnchorPos = nil
+            continue
+        end
+
+        StatusLabel.Visible = true
+
+        local char = LocalPlayer.Character
+        if not char then
+            StatusLabel.Text = "VOID - No Character"
+            isInVoidPhase = false
+            continue
+        end
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        local humanoid = char:FindFirstChildOfClass("Humanoid")
+        if not hrp or not humanoid then
+            StatusLabel.Text = "VOID - No HRP"
+            isInVoidPhase = false
+            continue
+        end
+
+        if tick() - lastKillTime < KillDelay then
+            StatusLabel.Text = "KILL DELAY..."
+            continue
+        end
+
+        local hasWeapon = false
+        if FighterController and FighterController.LocalFighter then
+            local item = FighterController.LocalFighter.EquippedItem
+            if item then
+                local success, objId = pcall(function() return item:Get("ObjectID") end)
+                if success and objId then
+                    hasWeapon = true
+                end
+            end
+        end
+
+        if not hasWeapon then
+            StatusLabel.Text = "WAITING FOR WEAPON..."
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            isInVoidPhase = false
+            continue
+        end
+
+        local closestManipTarget = nil
+        local closestManipDist = 7.5
+
+        if isManipulacionOn then
+            for _, player in ipairs(plrs:GetPlayers()) do
+                if isTargetValid(player) then
+                    local pRoot = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+                    if pRoot then
+                        local dist = (hrp.Position - pRoot.Position).Magnitude
+                        if dist <= closestManipDist then
+                            closestManipDist = dist
+                            closestManipTarget = player
+                        end
+                    end
+                end
+            end
+        end
+
+        local targetPlayer, targetRoot, targetHead = getClosestTarget(math.huge)
+
+        if not targetPlayer or not targetRoot or not targetHead then
+            if lastTarget then
+                lastKillTime = tick()
+            end
+            if not (isManipulacionOn and closestManipTarget) then
+                if UndergroundManipulationEnabled then
+                    StatusLabel.Text = "UNDERGROUND MANIPULATION (35 STUDS)"
+                else
+                    StatusLabel.Text = "VOID - No Target"
+                end
+            end
+            lastTarget = nil
+            lastTargetPos = nil
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            isInVoidPhase = false
+            continue
+        end
+
+        if AntiCounterEnabled and targetRoot then
+            local targetVel = targetRoot.AssemblyLinearVelocity.Magnitude
+            local myY = hrp.Position.Y
+            local targetY = targetRoot.Position.Y
+            local isCountering = targetVel > 80 or math.abs(targetY - myY) > 15
+            if isCountering and not (isManipulacionOn and closestManipTarget) then
+                StatusLabel.Text = "ANTI-COUNTER → " .. targetPlayer.Name
+            end
+        end
+
+        local predictedPos = targetRoot.Position
+        lastTarget = targetPlayer
+        lastTargetPos = targetRoot.Position
+
+        isInVoidPhase = false
+
+        local prefix = customStatusPrefix
+        if randomStatusMode then
+            prefix = randomWords[math.random(1, #randomWords)]
+        end
+
+        if isManipulacionOn and closestManipTarget then
+            StatusLabel.Text = prefix .. ": MANIPULATING (" .. closestManipTarget.Name .. ")"
+        else
+            StatusLabel.Text = prefix .. " → " .. targetPlayer.Name
+        end
+
+        local attackStart = tick()
+        while isRagebotOn and (tick() - attackStart < 0.95) do
+            if not string.find(StatusLabel.Text, "→") and not string.find(StatusLabel.Text, "MANIPULATING") then break end
+
+            local currentTargetPlayer, currentTargetRoot, currentTargetHead = getClosestTarget(math.huge)
+            if not currentTargetPlayer or not currentTargetRoot or not currentTargetHead then break end
+
+            local currentPredictedPos = currentTargetRoot.Position
+
+            if UndergroundManipulationEnabled then
+                undergroundAnchorPos = currentTargetRoot.Position
+                if tick() - undergroundTimer >= 0 then
+                    undergroundTimer = tick()
+                    local randomX = math.random(-35, 35)
+                    local randomZ = math.random(-35, 35)
+                    currentUndergroundOffset = Vector3.new(randomX, -5, randomZ)
+                end
+                local finalCF = CFrame.new(currentPredictedPos + currentUndergroundOffset + Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)) * CFrame.Angles(math.rad(-90), 0, 0)
+                
+                if (hrp.Position - finalCF.Position).Magnitude > 0 then
+                    hrp.CFrame = finalCF
+                end
+            else
+                local offset = Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)
+                local finalCF = CFrame.new(currentPredictedPos + offset) * CFrame.Angles(math.rad(-90), 0, 0)
+                
+                if (hrp.Position - finalCF.Position).Magnitude > 0 then
+                    hrp.CFrame = finalCF
+                end
+            end
+
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+
+            if FighterController and FighterController.LocalFighter then
+                local item = FighterController.LocalFighter.EquippedItem
+                if item and util and enum then
+                    local originPos = hrp.Position
+                    local targetPos = currentTargetHead.Position
+
+                    local randomOffset = Vector3.new(
+                        (math.random() - 0.5) * 0.035,
+                        (math.random() - 0.5) * 0.035,
+                        (math.random() - 0.5) * 0.035
+                    )
+
+                    local aimCF = CFrame.lookAt(originPos, targetPos + randomOffset)
+                    local targetCF = currentTargetHead.CFrame
+                    local objSpaceHeadOffset = currentTargetHead.CFrame:ToObjectSpace(CFrame.new(targetPos + randomOffset))
+
+                    local cameradata = {}
+                    cameradata[utf8.char(1)] = {
+                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+                        [utf8.char(1)] = util:EncodeCFrame(targetCF),
+                        [utf8.char(2)] = currentTargetHead,
+                        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+                    }
+
+                    pcall(function()
+                        repS.Remotes.Replication.Fighter.UseItem:FireServer(
+                            item:Get("ObjectID"),
+                            enum:ToEnum("StartShooting"),
+                            cameradata,
+                            nil
+                        )
+                    end)
+                end
+            end
+
+            task.wait()
+        end
+
+        if isRagebotOn and VoidPhaseEnabled then
+            isInVoidPhase = true
+            StatusLabel.Text = "VOID PHASE"
+            local voidStartTime = tick()
+
+            while isRagebotOn and (tick() - voidStartTime < 0.05) do
+                hrp.CFrame = hrp.CFrame + Vector3.new(0, 5000000, 0)
+                hrp.AssemblyLinearVelocity = Vector3.new(0, 999999999, 0)
+                hrp.AssemblyAngularVelocity = Vector3.zero
+                task.wait()
+            end
+
+            isInVoidPhase = false
+        end
+    end
+end)
