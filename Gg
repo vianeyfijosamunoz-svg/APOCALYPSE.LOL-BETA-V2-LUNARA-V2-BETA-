@@ -1,55 +1,3 @@
--- ==========================================
--- SISTEMA ANTI-KICK / ANTI-BAN (Control Manual)
--- ==========================================
-getgenv().AntiKickEnabled = true
-
-pcall(function()
-    if getgenv().AntiKickHooked then return end
-    getgenv().AntiKickHooked = true
-
-    local mt = getrawmetatable(game)
-    if not mt then return end
-    
-    setreadonly(mt, false)
-    local oldNamecall = mt.__namecall
-    
-    mt.__namecall = newcclosure(function(self, ...)
-        local method = getnamecallmethod()
-        
-        if getgenv().AntiKickEnabled and method:lower() == "kick" and self == game:GetService("Players").LocalPlayer then
-            warn("[AXE HUB] Intento de Kick bloqueado exitosamente.")
-            return nil
-        end
-        
-        return oldNamecall(self, ...)
-    end)
-    
-    setreadonly(mt, true)
-end)
-
-pcall(function()
-    local CoreGui = game:GetService("CoreGui")
-    local NotifyGui = Instance.new("ScreenGui")
-    NotifyGui.Name = "AntiKickNotify"
-    NotifyGui.Parent = (gethui and gethui()) or CoreGui
-
-    local TextLabel = Instance.new("TextLabel")
-    TextLabel.Size = UDim2.new(0, 300, 0, 40)
-    TextLabel.Position = UDim2.new(0.5, -150, 0.1, 0)
-    TextLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    TextLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
-    TextLabel.TextSize = 13
-    TextLabel.Font = Enum.Font.Code
-    TextLabel.Text = "🛡️ Anti-Kick & Anti-Ban Activado"
-    TextLabel.Parent = NotifyGui
-
-    Instance.new("UICorner", TextLabel).CornerRadius = UDim.new(0, 6)
-
-    task.delay(4, function()
-        NotifyGui:Destroy()
-    end)
-end)
-
 local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
@@ -723,22 +671,42 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         return "rbxassetid://6023426915"
                     end
 
-                    local function isWeaponCosmetic(name, cosmetic)
-                        if not name then return false end
-                        local n = tostring(name):lower()
-                        local t = (cosmetic and tostring(cosmetic.Type or ""):lower()) or ""
+                    local function isValidCosmeticForWeapon(cosmeticName, weaponName, category)
+                        local cosmetic = CosmeticLibrary.Cosmetics[cosmeticName]
+                        if not cosmetic then return false end
+
+                        local t = tostring(cosmetic.Type or ""):lower()
+                        local n = tostring(cosmeticName):lower()
+                        local w = tostring(weaponName):lower()
+
                         if t:find("finisher") or t:find("emote") or t:find("dance") or t:find("kill") then
                             return false
                         end
-                        if t == "skin" or t == "charm" or t == "wrap" or t == "wrapping" then
+
+                        if category == "Skin" then
+                            if not (t == "skin" or n:find("skin")) then return false end
+                        elseif category == "Charm" then
+                            if not (t == "charm" or n:find("charm")) then return false end
+                        elseif category == "Wrap" then
+                            if not (t == "wrap" or t == "wrapping" or n:find("wrap")) then return false end
+                        end
+
+                        if cosmetic.Weapon and tostring(cosmetic.Weapon):lower() == w then
                             return true
                         end
-                        if n:find("skin") or n:find("charm") or n:find("wrap") then
+
+                        if n:find(w) then
                             return true
                         end
-                        if cosmetic and (cosmetic.Seed or cosmetic.ObjectID or cosmetic.Enum) then
-                            return true
+
+                        if cosmetic.CompatibleWeapons then
+                            for _, cw in pairs(cosmetic.CompatibleWeapons) do
+                                if tostring(cw):lower() == w then
+                                    return true
+                                end
+                            end
                         end
+
                         return false
                     end
 
@@ -812,20 +780,10 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         if name:find("MISSING_") then
                             return originalOwns(self, inventory, name, weapon)
                         end
-                        local cosmetic = CosmeticLibrary.Cosmetics[name]
-                        if isWeaponCosmetic(name, cosmetic) then
+                        if weapon and isValidCosmeticForWeapon(name, weapon, "Skin") then
                             return true
                         end
                         return originalOwns(self, inventory, name, weapon)
-                    end
-
-                    for _, funcName in pairs({"OwnsCosmeticNormally", "OwnsCosmeticUniversally", "OwnsCosmeticForWeapon"}) do
-                        if CosmeticLibrary[funcName] then
-                            CosmeticLibrary[funcName] = function(_, _, name)
-                                local c = CosmeticLibrary.Cosmetics[name]
-                                return isWeaponCosmetic(name, c)
-                            end
-                        end
                     end
 
                     local originalGet = DataController.Get
@@ -833,19 +791,12 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         local data = originalGet(self, key)
                         if key == "CosmeticInventory" then
                             local proxy = {}
-                            for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                                if isWeaponCosmetic(name, cosmetic) then
-                                    proxy[name] = true
-                                end
-                            end
-                            return setmetatable(proxy, {
+                            setmetatable(proxy, {
                                 __index = function(_, k)
-                                    local c = CosmeticLibrary.Cosmetics[k]
-                                    if isWeaponCosmetic(k, c) then
-                                        return true
-                                    end
+                                    return true
                                 end
                             })
+                            return proxy
                         end
                         return data
                     end
@@ -879,6 +830,10 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
 
                     local function equipCosmetic(name, ctype)
                         if not selectedWeapon then return end
+                        if not isValidCosmeticForWeapon(name, selectedWeapon, ctype) then
+                            showNotify("Skin no válida para esta arma")
+                            return
+                        end
                         equipped[selectedWeapon] = equipped[selectedWeapon] or {}
                         local cloned = cloneCosmetic(name, ctype)
                         if not cloned then return end
@@ -886,24 +841,6 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         forceUpdateWeapon(selectedWeapon)
                         saveConfig()
                         showNotify("✓ " .. name)
-
-                        task.delay(0.5, function()
-                            if equipped[selectedWeapon] and equipped[selectedWeapon][ctype] then
-                                local targetCosmetic = equipped[selectedWeapon][ctype]
-                                if EnumLibrary then
-                                    pcall(function()
-                                        local newEnum = EnumLibrary:ToEnum(targetCosmetic.Name)
-                                        if newEnum then
-                                            targetCosmetic.Enum = newEnum
-                                            targetCosmetic.ObjectID = newEnum
-                                        end
-                                    end)
-                                else
-                                    targetCosmetic.ObjectID = math.random(1000, 999999)
-                                end
-                                forceUpdateWeapon(selectedWeapon)
-                            end
-                        end)
                     end
 
                     local function unequipCurrent()
@@ -923,16 +860,8 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         if not selectedWeapon then return end
                         local list = {}
                         for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                            if isWeaponCosmetic(name, cosmetic) then
-                                local t = tostring(cosmetic.Type or ""):lower()
-                                local n = name:lower()
-                                local match = false
-                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then match = true end
-                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then match = true end
-                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then match = true end
-                                if match then
-                                    table.insert(list, name)
-                                end
+                            if isValidCosmeticForWeapon(name, selectedWeapon, currentCategory) then
+                                table.insert(list, name)
                             end
                         end
                         if #list > 0 then
@@ -956,9 +885,11 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                                     if weaponName then
                                         equipped[weaponName] = equipped[weaponName] or {}
                                         if cosmeticName and cosmeticName ~= "None" and cosmeticName ~= "" then
-                                            local cloned = cloneCosmetic(cosmeticName, cosmeticType)
-                                            if cloned then
-                                                equipped[weaponName][cosmeticType] = cloned
+                                            if isValidCosmeticForWeapon(cosmeticName, weaponName, cosmeticType) then
+                                                local cloned = cloneCosmetic(cosmeticName, cosmeticType)
+                                                if cloned then
+                                                    equipped[weaponName][cosmeticType] = cloned
+                                                end
                                             end
                                         else
                                             equipped[weaponName][cosmeticType] = nil
@@ -1277,16 +1208,9 @@ CosmeticsGroup:AddToggle("ShowCosmeticChanger", {
                         
                         local count = 0
                         for name, cosmetic in pairs(CosmeticLibrary.Cosmetics) do
-                            if isWeaponCosmetic(name, cosmetic) then
-                                local typeMatch = false
-                                local t = tostring(cosmetic.Type or ""):lower()
+                            if selectedWeapon and isValidCosmeticForWeapon(name, selectedWeapon, currentCategory) then
                                 local n = name:lower()
-                                
-                                if currentCategory == "Skin" and (t == "skin" or n:find("skin")) then typeMatch = true end
-                                if currentCategory == "Charm" and (t == "charm" or n:find("charm")) then typeMatch = true end
-                                if currentCategory == "Wrap" and (t == "wrap" or t == "wrapping" or n:find("wrap")) then typeMatch = true end
-                                
-                                if typeMatch and (not filter or filter == "" or n:find(filter:lower())) then
+                                if (not filter or filter == "" or n:find(filter:lower())) then
                                     if not (showOnlyFavorites and not favorites[name]) then
                                         count += 1
                                         local btn = Instance.new("TextButton")
@@ -1925,19 +1849,6 @@ MiscRight:AddToggle("MiscUndergroundToggle", {
 
 local UtilityRight = Tabs["Misc"]:AddRightGroupbox("Utility")
 
-UtilityRight:AddToggle("MiscAntiKick", {
-    Text = "Anti-Kick & Anti-Ban",
-    Default = true,
-    Callback = function(Value)
-        getgenv().AntiKickEnabled = Value
-        if Value then
-            Library:Notify("🛡️ Anti-Kick Activado", 3)
-        else
-            Library:Notify("⚠️ Anti-Kick Desactivado", 3)
-        end
-    end
-})
-
 UtilityRight:AddButton("Reset Character", function()
     local char = LocalPlayer.Character
     if char and char:FindFirstChildOfClass("Humanoid") then
@@ -2120,7 +2031,7 @@ local function isEnemy(player)
 end
 
 local function isTargetValid(player)
-    if player == LocalPlayer then return false end
+    if not player or not isEnemy(player) then return false end
     local pChar = player.Character
     if not pChar then return false end
     local pRoot = pChar:FindFirstChild("HumanoidRootPart")
