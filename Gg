@@ -1,3 +1,55 @@
+-- ==========================================
+-- SISTEMA ANTI-KICK / ANTI-BAN (Control Manual)
+-- ==========================================
+getgenv().AntiKickEnabled = true
+
+pcall(function()
+    if getgenv().AntiKickHooked then return end
+    getgenv().AntiKickHooked = true
+
+    local mt = getrawmetatable(game)
+    if not mt then return end
+    
+    setreadonly(mt, false)
+    local oldNamecall = mt.__namecall
+    
+    mt.__namecall = newcclosure(function(self, ...)
+        local method = getnamecallmethod()
+        
+        if getgenv().AntiKickEnabled and method:lower() == "kick" and self == game:GetService("Players").LocalPlayer then
+            warn("[AXE HUB] Intento de Kick bloqueado exitosamente.")
+            return nil
+        end
+        
+        return oldNamecall(self, ...)
+    end)
+    
+    setreadonly(mt, true)
+end)
+
+pcall(function()
+    local CoreGui = game:GetService("CoreGui")
+    local NotifyGui = Instance.new("ScreenGui")
+    NotifyGui.Name = "AntiKickNotify"
+    NotifyGui.Parent = (gethui and gethui()) or CoreGui
+
+    local TextLabel = Instance.new("TextLabel")
+    TextLabel.Size = UDim2.new(0, 300, 0, 40)
+    TextLabel.Position = UDim2.new(0.5, -150, 0.1, 0)
+    TextLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    TextLabel.TextColor3 = Color3.fromRGB(0, 255, 128)
+    TextLabel.TextSize = 13
+    TextLabel.Font = Enum.Font.Code
+    TextLabel.Text = "🛡️ Anti-Kick & Anti-Ban Activado"
+    TextLabel.Parent = NotifyGui
+
+    Instance.new("UICorner", TextLabel).CornerRadius = UDim.new(0, 6)
+
+    task.delay(4, function()
+        NotifyGui:Destroy()
+    end)
+end)
+
 local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
@@ -1873,6 +1925,19 @@ MiscRight:AddToggle("MiscUndergroundToggle", {
 
 local UtilityRight = Tabs["Misc"]:AddRightGroupbox("Utility")
 
+UtilityRight:AddToggle("MiscAntiKick", {
+    Text = "Anti-Kick & Anti-Ban",
+    Default = true,
+    Callback = function(Value)
+        getgenv().AntiKickEnabled = Value
+        if Value then
+            Library:Notify("🛡️ Anti-Kick Activado", 3)
+        else
+            Library:Notify("⚠️ Anti-Kick Desactivado", 3)
+        end
+    end
+})
+
 UtilityRight:AddButton("Reset Character", function()
     local char = LocalPlayer.Character
     if char and char:FindFirstChildOfClass("Humanoid") then
@@ -2055,7 +2120,7 @@ local function isEnemy(player)
 end
 
 local function isTargetValid(player)
-    if not player or not isEnemy(player) then return false end
+    if player == LocalPlayer then return false end
     local pChar = player.Character
     if not pChar then return false end
     local pRoot = pChar:FindFirstChild("HumanoidRootPart")
