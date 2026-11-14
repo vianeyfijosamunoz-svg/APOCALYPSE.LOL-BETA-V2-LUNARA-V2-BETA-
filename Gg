@@ -1,4 +1,4 @@
-Local RIVALS_GAME_ID = 6035872082
+local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
     warn("[shako.win] " .. msg .. " | GameId=" .. tostring(game.GameId))
@@ -69,11 +69,6 @@ local initialPosition = nil
 local rageOffsetX = 0
 local rageOffsetY = 0
 local rageOffsetZ = 0
-
-local UndergroundManipulationEnabled = false
-local undergroundTimer = 0
-local currentUndergroundOffset = Vector3.new(0, -5, 0)
-local undergroundAnchorPos = nil
 
 local autoFireRange = 50
 
@@ -346,7 +341,6 @@ RageGroup:AddToggle("RagebotToggle", {
         if not Value then
             StatusLabel.Text = "VOID"
             isInVoidPhase = false
-            undergroundAnchorPos = nil
         end
     end
 })
@@ -356,17 +350,6 @@ RageGroup:AddToggle("ManipulacionToggle", {
     Default = false,
     Callback = function(Value)
         isManipulacionOn = Value
-    end
-})
-
-RageGroup:AddToggle("UndergroundManipulationToggle", {
-    Text = "Underground Manipulation",
-    Default = false,
-    Callback = function(Value)
-        UndergroundManipulationEnabled = Value
-        if not Value then
-            undergroundAnchorPos = nil
-        end
     end
 })
 
@@ -449,7 +432,6 @@ RageGroup:AddLabel("Ragebot Keybind"):AddKeyPicker("RagebotKeybind", {
         if not Value then
             StatusLabel.Text = "VOID"
             isInVoidPhase = false
-            undergroundAnchorPos = nil
         end
     end
 })
@@ -1992,7 +1974,6 @@ local RemsPresets = {
     ["Rage Full - Destroyer"] = function()
         Toggles.RagebotToggle:SetValue(true)
         Toggles.ManipulacionToggle:SetValue(true)
-        Toggles.UndergroundManipulationToggle:SetValue(true)
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.ResolverToggle:SetValue(true)
         Toggles.AntiCounterToggle:SetValue(true)
@@ -2013,7 +1994,6 @@ local RemsPresets = {
     ["Rage Full - Counter God"] = function()
         Toggles.RagebotToggle:SetValue(true)
         Toggles.ManipulacionToggle:SetValue(false)
-        Toggles.UndergroundManipulationToggle:SetValue(true)
         Toggles.VoidPhaseToggle:SetValue(true)
         Toggles.ResolverToggle:SetValue(true)
         Toggles.AntiCounterToggle:SetValue(true)
@@ -2033,7 +2013,6 @@ local RemsPresets = {
     ["Legit - Closet Visuals"] = function()
         Toggles.RagebotToggle:SetValue(false)
         Toggles.ManipulacionToggle:SetValue(false)
-        Toggles.UndergroundManipulationToggle:SetValue(false)
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.UEKillersToggle:SetValue(false)
         Toggles.AxeCounterToggle:SetValue(false)
@@ -2053,7 +2032,6 @@ local RemsPresets = {
     ["Legit - Pro Movement"] = function()
         Toggles.RagebotToggle:SetValue(false)
         Toggles.ManipulacionToggle:SetValue(false)
-        Toggles.UndergroundManipulationToggle:SetValue(false)
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.UEKillersToggle:SetValue(false)
         Toggles.AxeCounterToggle:SetValue(false)
@@ -2467,40 +2445,6 @@ RunService.Heartbeat:Connect(function()
 end)
 
 RunService.Stepped:Connect(function()
-    if not isRagebotOn or not UndergroundManipulationEnabled then 
-        undergroundAnchorPos = nil
-        return 
-    end
-    
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-
-    if not undergroundAnchorPos or (Vector3.new(hrp.Position.X, 0, hrp.Position.Z) - Vector3.new(undergroundAnchorPos.X, 0, undergroundAnchorPos.Z)).Magnitude > 50 then
-        undergroundAnchorPos = hrp.Position
-    end
-
-    if tick() - undergroundTimer >= 0 then
-        undergroundTimer = tick()
-        local randomX = math.random(-35, 35)
-        local randomZ = math.random(-35, 35)
-        currentUndergroundOffset = Vector3.new(randomX, -5, randomZ)
-    end
-
-    local targetPos = undergroundAnchorPos + currentUndergroundOffset
-    hrp.CFrame = CFrame.new(targetPos) * (hrp.CFrame - hrp.CFrame.Position)
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-end)
-
-RunService.Stepped:Connect(function()
     if not MiscUndergroundEnabled then return end
     local char = LocalPlayer.Character
     if not char then return end
@@ -2623,7 +2567,6 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 LocalPlayer.CharacterAdded:Connect(function(char)
-    undergroundAnchorPos = nil
     task.wait(0.5)
     local hum = char:FindFirstChildOfClass("Humanoid")
     if hum then
@@ -2920,7 +2863,6 @@ task.spawn(function()
             lastTarget = nil
             lastTargetPos = nil
             isInVoidPhase = false
-            undergroundAnchorPos = nil
             continue
         end
 
@@ -2990,11 +2932,7 @@ task.spawn(function()
                 lastKillTime = tick()
             end
             if not (isManipulacionOn and closestManipTarget) then
-                if UndergroundManipulationEnabled then
-                    StatusLabel.Text = "UNDERGROUND MANIPULATION (35 STUDS)"
-                else
-                    StatusLabel.Text = "VOID - No Target"
-                end
+                StatusLabel.Text = "VOID - No Target"
             end
             lastTarget = nil
             lastTargetPos = nil
@@ -3038,27 +2976,11 @@ task.spawn(function()
             if not currentTargetPlayer or not currentTargetRoot or not currentTargetHead then break end
 
             local currentPredictedPos = currentTargetRoot.Position
-
-            if UndergroundManipulationEnabled then
-                undergroundAnchorPos = currentTargetRoot.Position
-                if tick() - undergroundTimer >= 0 then
-                    undergroundTimer = tick()
-                    local randomX = math.random(-35, 35)
-                    local randomZ = math.random(-35, 35)
-                    currentUndergroundOffset = Vector3.new(randomX, -5, randomZ)
-                end
-                local finalCF = CFrame.new(currentPredictedPos + currentUndergroundOffset + Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)) * CFrame.Angles(math.rad(-90), 0, 0)
-                
-                if (hrp.Position - finalCF.Position).Magnitude > 0 then
-                    hrp.CFrame = finalCF
-                end
-            else
-                local offset = Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)
-                local finalCF = CFrame.new(currentPredictedPos + offset) * CFrame.Angles(math.rad(-90), 0, 0)
-                
-                if (hrp.Position - finalCF.Position).Magnitude > 0 then
-                    hrp.CFrame = finalCF
-                end
+            local offset = Vector3.new(rageOffsetX, rageOffsetY, rageOffsetZ)
+            local finalCF = CFrame.new(currentPredictedPos + offset) * CFrame.Angles(math.rad(-90), 0, 0)
+            
+            if (hrp.Position - finalCF.Position).Magnitude > 0 then
+                hrp.CFrame = finalCF
             end
 
             hrp.AssemblyLinearVelocity = Vector3.zero
