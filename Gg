@@ -23,7 +23,6 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
-local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -131,6 +130,21 @@ local ESPArrowColor = Color3.fromRGB(0, 255, 128)
 
 local ESPWeapon = false
 local ESPWeaponColor = Color3.fromRGB(0, 200, 255)
+
+-- Weapon Chams (ObjectID / Viewmodel Chams)
+local WeaponChamsEnabled = false
+local WeaponChamsMaterial = "Neon"
+local WeaponChamsColor = Color3.fromRGB(0, 255, 255)
+local WeaponChamsTeamCheck = false
+
+-- Viewmodel Customizer Configs
+local ViewmodelCustomizerEnabled = false
+local VM_X = 0
+local VM_Y = 0
+local VM_Z = 0
+local VM_RotX = 0
+local VM_RotY = 0
+local VM_RotZ = 0
 
 local ESPTeamCheck = true
 
@@ -644,6 +658,115 @@ ESPGroup:AddToggle("ESPTeamCheck", {
     Default = true,
     Callback = function(Value)
         ESPTeamCheck = Value
+    end
+})
+
+local WeaponChamsGroup = Tabs["Visuals"]:AddRightGroupbox("Weapon Chams (ObjectID)")
+
+WeaponChamsGroup:AddToggle("WeaponChamsEnabled", {
+    Text = "ENABLED",
+    Default = false,
+    Callback = function(Value)
+        WeaponChamsEnabled = Value
+    end
+}):AddColorPicker("WeaponChamsColorPicker", {
+    Default = WeaponChamsColor,
+    Callback = function(Value)
+        WeaponChamsColor = Value
+    end
+})
+
+WeaponChamsGroup:AddDropdown("WeaponChamsMaterialDropdown", {
+    Values = {"Neon", "Glass", "SmoothPlastic", "ForceField", "Wood", "Metal"},
+    Default = 1,
+    Multi = false,
+    Text = "Weapon Material",
+    Callback = function(Value)
+        WeaponChamsMaterial = Value
+    end
+})
+
+WeaponChamsGroup:AddToggle("WeaponChamsTeamCheck", {
+    Text = "Team Check",
+    Default = false,
+    Callback = function(Value)
+        WeaponChamsTeamCheck = Value
+    end
+})
+
+local ViewmodelGroup = Tabs["Visuals"]:AddRightGroupbox("Viewmodel Customizer")
+
+ViewmodelGroup:AddToggle("ViewmodelCustomizerEnabled", {
+    Text = "ENABLED",
+    Default = false,
+    Callback = function(Value)
+        ViewmodelCustomizerEnabled = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_X", {
+    Text = "Position X",
+    Default = 0,
+    Min = -5,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        VM_X = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_Y", {
+    Text = "Position Y",
+    Default = 0,
+    Min = -5,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        VM_Y = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_Z", {
+    Text = "Position Z",
+    Default = 0,
+    Min = -5,
+    Max = 5,
+    Rounding = 1,
+    Callback = function(Value)
+        VM_Z = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_RotX", {
+    Text = "Rotation X",
+    Default = 0,
+    Min = -180,
+    Max = 180,
+    Rounding = 0,
+    Callback = function(Value)
+        VM_RotX = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_RotY", {
+    Text = "Rotation Y",
+    Default = 0,
+    Min = -180,
+    Max = 180,
+    Rounding = 0,
+    Callback = function(Value)
+        VM_RotY = Value
+    end
+})
+
+ViewmodelGroup:AddSlider("VM_RotZ", {
+    Text = "Rotation Z",
+    Default = 0,
+    Min = -180,
+    Max = 180,
+    Rounding = 0,
+    Callback = function(Value)
+        VM_RotZ = Value
     end
 })
 
@@ -2151,6 +2274,45 @@ local function removeDrawings(player)
     end
 end
 
+local function updateWeaponChams()
+    if not WeaponChamsEnabled then return end
+    
+    pcall(function()
+        for _, player in ipairs(plrs:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local isAllowed = true
+                if WeaponChamsTeamCheck then
+                    isAllowed = isEnemy(player)
+                end
+                
+                if isAllowed and player.Character then
+                    for _, desc in ipairs(player.Character:GetDescendants()) do
+                        if desc:IsA("BasePart") then
+                            local matEnum = Enum.Material[WeaponChamsMaterial] or Enum.Material.Neon
+                            desc.Material = matEnum
+                            desc.Color = WeaponChamsColor
+                        end
+                    end
+                end
+            end
+        end
+    end)
+end
+
+local function updateViewmodel()
+    if not ViewmodelCustomizerEnabled then return end
+    pcall(function()
+        if FighterController and FighterController.LocalFighter and FighterController.LocalFighter.EquippedItem then
+            local item = FighterController.LocalFighter.EquippedItem
+            local model = item.Model or item.Handle or item.Part
+            if model and model:IsA("BasePart") then
+                -- Aplicar offsets en tiempo real
+                model.CFrame = Camera.CFrame * CFrame.new(VM_X, VM_Y, VM_Z) * CFrame.Angles(math.rad(VM_RotX), math.rad(VM_RotY), math.rad(VM_RotZ))
+            end
+        end
+    end)
+end
+
 local function updateESP()
     if not ESPEnabled then
         for player, _ in pairs(Drawings) do
@@ -2277,18 +2439,10 @@ local function updateESP()
             if ESPWeapon then
                 local weaponName = "Unknown"
                 pcall(function()
-                    if player.Character then
-                        -- Buscar ObjectID o nombre del arma equipada del enemigo
-                        local fighterObj = nil
-                        if getrenv and getrenv().FighterController then
-                            -- Intento de extraer mediante clases del juego si existen
-                        end
-                        -- Alternativa usando atributos o nombres de objetos activos
-                        for _, itemChild in ipairs(player.Character:GetChildren()) do
-                            if itemChild:IsA("Model") or itemChild:IsA("Tool") then
-                                weaponName = itemChild.Name
-                                break
-                            end
+                    for _, itemChild in ipairs(player.Character:GetChildren()) do
+                        if itemChild:IsA("Model") or itemChild:IsA("Tool") then
+                            weaponName = itemChild.Name
+                            break
                         end
                     end
                 end)
@@ -2345,9 +2499,11 @@ local function updateESP()
     end
 end
 
--- Watermark Update Loop
+-- Watermark & General Loops
 RunService.RenderStepped:Connect(function()
     updateESP()
+    updateWeaponChams()
+    updateViewmodel()
 
     if WatermarkEnabled then
         local parts = {}
@@ -2676,7 +2832,7 @@ runS.Heartbeat:Connect(function()
 
     local cameradata = {}
     cameradata[utf8.char(1)] = {
-        [utf8.char(0)] = util:EncodeCFrame(aimCF),
+                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
         [utf8.char(1)] = util:EncodeCFrame(targetCF),
         [utf8.char(2)] = targetHead,
         [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
