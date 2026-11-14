@@ -1,4 +1,4 @@
-local RIVALS_GAME_ID = 6035872082
+Local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
     warn("[shako.win] " .. msg .. " | GameId=" .. tostring(game.GameId))
@@ -170,6 +170,7 @@ local ThemeManager = loadstring(game:HttpGet(repo.."addons/ThemeManager.lua"))()
 local SaveManager = loadstring(game:HttpGet(repo.."addons/SaveManager.lua"))()
 
 local Options = Library.Options
+local Toggles = Library.Toggles
 
 Library.ForceCheckbox = false
 Library.ShowToggleFrameInKeybinds = true
@@ -1982,6 +1983,115 @@ UtilityRight:AddToggle("MiscShowPing", {
         getgenv().ShowPing = Value
     end
 })
+
+local RemsGroup = Tabs["UI Settings"]:AddRightGroupbox("REM'S CONFIGS")
+
+local SelectedRemConfig = "Rage Full - Destroyer"
+
+local RemsPresets = {
+    ["Rage Full - Destroyer"] = function()
+        Toggles.RagebotToggle:SetValue(true)
+        Toggles.ManipulacionToggle:SetValue(true)
+        Toggles.UndergroundManipulationToggle:SetValue(true)
+        Toggles.VoidPhaseToggle:SetValue(false)
+        Toggles.ResolverToggle:SetValue(true)
+        Toggles.AntiCounterToggle:SetValue(true)
+        Options.KillDelaySlider:SetValue(0)
+        Options.AutoFireRangeSlider:SetValue(5000)
+        Options.PriorityModeDropdown:SetValue("Closest")
+        Toggles.AntiAimToggle:SetValue(true)
+        Options.AntiAimModeDropdown:SetValue("Random 360")
+        Options.AntiAimPitchDropdown:SetValue("Down (Hide Head)")
+        Toggles.AntiAimDesyncFlick:SetValue(true)
+        Options.AntiAimSpeedSlider:SetValue(5000)
+        Toggles.ESPEnabled:SetValue(true)
+        Toggles.ESPBox:SetValue(true)
+        Toggles.ESPChams:SetValue(true)
+        Toggles.ESPHealth:SetValue(true)
+    end,
+
+    ["Rage Full - Counter God"] = function()
+        Toggles.RagebotToggle:SetValue(true)
+        Toggles.ManipulacionToggle:SetValue(false)
+        Toggles.UndergroundManipulationToggle:SetValue(true)
+        Toggles.VoidPhaseToggle:SetValue(true)
+        Toggles.ResolverToggle:SetValue(true)
+        Toggles.AntiCounterToggle:SetValue(true)
+        Toggles.AxeCounterToggle:SetValue(true)
+        Options.SideOffsetSlider:SetValue(8)
+        Options.SpinSpeedSlider:SetValue(850)
+        Options.SideSpeedSlider:SetValue(1500)
+        Options.AutoFireRangeSlider:SetValue(10000)
+        Options.PriorityModeDropdown:SetValue("VALUE (HP)")
+        Toggles.AntiAimToggle:SetValue(true)
+        Options.AntiAimModeDropdown:SetValue("Jitter")
+        Toggles.ESPEnabled:SetValue(true)
+        Toggles.ESPTracer:SetValue(true)
+        Toggles.ESPChams:SetValue(true)
+    end,
+
+    ["Legit - Closet Visuals"] = function()
+        Toggles.RagebotToggle:SetValue(false)
+        Toggles.ManipulacionToggle:SetValue(false)
+        Toggles.UndergroundManipulationToggle:SetValue(false)
+        Toggles.VoidPhaseToggle:SetValue(false)
+        Toggles.UEKillersToggle:SetValue(false)
+        Toggles.AxeCounterToggle:SetValue(false)
+        Toggles.AntiAimToggle:SetValue(false)
+        Toggles.SpinbotEnabled:SetValue(false)
+        Options.MiscSpeedBoost:SetValue(50)
+        Options.MiscFOV:SetValue(85)
+        Toggles.ESPEnabled:SetValue(true)
+        Toggles.ESPBox:SetValue(true)
+        Toggles.ESPName:SetValue(true)
+        Toggles.ESPDistance:SetValue(true)
+        Toggles.ESPHealth:SetValue(true)
+        Toggles.ESPChams:SetValue(false)
+        Toggles.ESPTracer:SetValue(false)
+    end,
+
+    ["Legit - Pro Movement"] = function()
+        Toggles.RagebotToggle:SetValue(false)
+        Toggles.ManipulacionToggle:SetValue(false)
+        Toggles.UndergroundManipulationToggle:SetValue(false)
+        Toggles.VoidPhaseToggle:SetValue(false)
+        Toggles.UEKillersToggle:SetValue(false)
+        Toggles.AxeCounterToggle:SetValue(false)
+        Toggles.AntiAimToggle:SetValue(false)
+        Options.MiscSpeedBoost:SetValue(62)
+        Options.MiscFOV:SetValue(95)
+        Toggles.MiscInfiniteJump:SetValue(false)
+        Toggles.MiscNoFallDamage:SetValue(true)
+        Toggles.ESPEnabled:SetValue(true)
+        Toggles.ESPChams:SetValue(true)
+        Toggles.ESPHeadDot:SetValue(true)
+        Toggles.ESPOffscreenArrows:SetValue(true)
+        Toggles.ESPBox:SetValue(false)
+    end
+}
+
+RemsGroup:AddDropdown("RemsConfigDropdown", {
+    Values = {
+        "Rage Full - Destroyer",
+        "Rage Full - Counter God",
+        "Legit - Closet Visuals",
+        "Legit - Pro Movement"
+    },
+    Default = 1,
+    Multi = false,
+    Text = "Select Preset",
+    Callback = function(Value)
+        SelectedRemConfig = Value
+    end
+})
+
+RemsGroup:AddButton("Load Selected Config", function()
+    local presetFunc = RemsPresets[SelectedRemConfig]
+    if presetFunc then
+        pcall(presetFunc)
+        Library:Notify("REM'S CONFIG cargado: " .. SelectedRemConfig, 4)
+    end
+end)
 
 local MenuGroup = Tabs["UI Settings"]:AddLeftGroupbox("Menu Settings")
 
