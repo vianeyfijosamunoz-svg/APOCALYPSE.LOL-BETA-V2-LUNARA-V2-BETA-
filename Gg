@@ -23,7 +23,7 @@ local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local CoreGui = game:GetService("CoreGui")
 local Lighting = game:GetService("Lighting")
-local TeleportService = game:GetService("TeleportService")
+local Stats = game:GetService("Stats")
 local LocalPlayer = Players.LocalPlayer
 local Camera = workspace.CurrentCamera
 
@@ -102,40 +102,51 @@ local ueGodmode = true
 local ueAutoEquip = true
 local ueShoot = true
 
-local AntiAimEnabled = false
-local AntiAimMode = "Spin"
-local AntiAimPitch = "None"
-local AntiAimSpeed = 1000
-local AntiAimIntensity = 10
-local AntiAimDesyncFlick = false
-local CameraShakeIntensity = 0
-local antiAimAngle = 0
-local lastFlickTime = 0
-
 local MiscUndergroundEnabled = false
 
+-- ESP Configs & Colors
 local ESPEnabled = false
 local ESPBox = false
-local ESPName = false
-local ESPDistance = false
-local ESPHealth = false
-local ESPTracer = false
-local ESPChams = false
-local ESPHeadDot = false
-local ESPOffscreenArrows = false
-local ESPTeamCheck = true
-local ESPMaxDistance = 2000
 local ESPBoxColor = Color3.fromRGB(0, 255, 128)
+
+local ESPName = false
 local ESPNameColor = Color3.fromRGB(255, 255, 255)
+
+local ESPDistance = false
+local ESPDistanceColor = Color3.fromRGB(200, 200, 200)
+
+local ESPHealth = false
+
+local ESPTracer = false
 local ESPTracerColor = Color3.fromRGB(0, 255, 128)
+
+local ESPChams = false
+local ESPChamsColor = Color3.fromRGB(0, 255, 128)
+
+local ESPHeadDot = false
+local ESPHeadDotColor = Color3.fromRGB(255, 0, 0)
+
+local ESPOffscreenArrows = false
+local ESPArrowColor = Color3.fromRGB(0, 255, 128)
+
+local ESPWeapon = false
+local ESPWeaponColor = Color3.fromRGB(0, 200, 255)
+
+local ESPTeamCheck = true
+
+-- Watermark Configs
+local WatermarkEnabled = false
+local WatermarkFPS = true
+local WatermarkPing = true
+local WatermarkName = true
+local WatermarkTime = true
+local WatermarkColor = Color3.fromRGB(0, 255, 128)
 
 local Drawings = {}
 local Highlights = {}
 
 local MiscSpeedBoost = 50
 local MiscJumpPower = 50
-local MiscHipHeight = 2
-local MiscFOV = 70
 local SpinbotEnabled = false
 local SpinbotSpeed = 500
 
@@ -158,6 +169,23 @@ StatusLabel.TextSize = 22
 StatusLabel.Font = Enum.Font.Code
 StatusLabel.Text = "VOID"
 StatusLabel.Parent = RageGui
+
+-- Watermark UI Setup
+local WatermarkLabel = Instance.new("TextLabel")
+WatermarkLabel.Name = "WatermarkLabel"
+WatermarkLabel.Size = UDim2.new(0, 300, 0, 30)
+WatermarkLabel.Position = UDim2.new(0, 15, 0, 15)
+WatermarkLabel.BackgroundTransparency = 0.3
+WatermarkLabel.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+WatermarkLabel.TextColor3 = WatermarkColor
+WatermarkLabel.TextSize = 13
+WatermarkLabel.Font = Enum.Font.Code
+WatermarkLabel.Visible = false
+WatermarkLabel.Parent = RageGui
+Instance.new("UICorner", WatermarkLabel).CornerRadius = UDim.new(0, 6)
+local WmStroke = Instance.new("UIStroke")
+WmStroke.Color = Color3.fromRGB(40, 40, 40)
+WmStroke.Parent = WatermarkLabel
 
 local repo = "https://raw.githubusercontent.com/deividcomsono/Obsidian/main/"
 local Library = loadstring(game:HttpGet(repo.."Library.lua"))()
@@ -505,6 +533,11 @@ ESPGroup:AddToggle("ESPBox", {
     Callback = function(Value)
         ESPBox = Value
     end
+}):AddColorPicker("ESPBoxColorPicker", {
+    Default = ESPBoxColor,
+    Callback = function(Value)
+        ESPBoxColor = Value
+    end
 })
 
 ESPGroup:AddToggle("ESPName", {
@@ -513,6 +546,11 @@ ESPGroup:AddToggle("ESPName", {
     Callback = function(Value)
         ESPName = Value
     end
+}):AddColorPicker("ESPNameColorPicker", {
+    Default = ESPNameColor,
+    Callback = function(Value)
+        ESPNameColor = Value
+    end
 })
 
 ESPGroup:AddToggle("ESPDistance", {
@@ -520,6 +558,11 @@ ESPGroup:AddToggle("ESPDistance", {
     Default = false,
     Callback = function(Value)
         ESPDistance = Value
+    end
+}):AddColorPicker("ESPDistanceColorPicker", {
+    Default = ESPDistanceColor,
+    Callback = function(Value)
+        ESPDistanceColor = Value
     end
 })
 
@@ -537,6 +580,11 @@ ESPGroup:AddToggle("ESPTracer", {
     Callback = function(Value)
         ESPTracer = Value
     end
+}):AddColorPicker("ESPTracerColorPicker", {
+    Default = ESPTracerColor,
+    Callback = function(Value)
+        ESPTracerColor = Value
+    end
 })
 
 ESPGroup:AddToggle("ESPChams", {
@@ -544,6 +592,11 @@ ESPGroup:AddToggle("ESPChams", {
     Default = false,
     Callback = function(Value)
         ESPChams = Value
+    end
+}):AddColorPicker("ESPChamsColorPicker", {
+    Default = ESPChamsColor,
+    Callback = function(Value)
+        ESPChamsColor = Value
     end
 })
 
@@ -553,6 +606,11 @@ ESPGroup:AddToggle("ESPHeadDot", {
     Callback = function(Value)
         ESPHeadDot = Value
     end
+}):AddColorPicker("ESPHeadDotColorPicker", {
+    Default = ESPHeadDotColor,
+    Callback = function(Value)
+        ESPHeadDotColor = Value
+    end
 })
 
 ESPGroup:AddToggle("ESPOffscreenArrows", {
@@ -561,6 +619,24 @@ ESPGroup:AddToggle("ESPOffscreenArrows", {
     Callback = function(Value)
         ESPOffscreenArrows = Value
     end
+}):AddColorPicker("ESPArrowColorPicker", {
+    Default = ESPArrowColor,
+    Callback = function(Value)
+        ESPArrowColor = Value
+    end
+})
+
+ESPGroup:AddToggle("ESPWeapon", {
+    Text = "Weapon / Object ESP",
+    Default = false,
+    Callback = function(Value)
+        ESPWeapon = Value
+    end
+}):AddColorPicker("ESPWeaponColorPicker", {
+    Default = ESPWeaponColor,
+    Callback = function(Value)
+        ESPWeaponColor = Value
+    end
 })
 
 ESPGroup:AddToggle("ESPTeamCheck", {
@@ -568,17 +644,6 @@ ESPGroup:AddToggle("ESPTeamCheck", {
     Default = true,
     Callback = function(Value)
         ESPTeamCheck = Value
-    end
-})
-
-ESPGroup:AddSlider("ESPMaxDistance", {
-    Text = "Max Distance",
-    Default = 2000,
-    Min = 100,
-    Max = 5000,
-    Rounding = 0,
-    Callback = function(Value)
-        ESPMaxDistance = Value
     end
 })
 
@@ -1743,226 +1808,52 @@ MiscLeft:AddSlider("MiscJumpPower", {
     end
 })
 
-MiscLeft:AddSlider("MiscHipHeight", {
-    Text = "Hip Height",
-    Default = 2,
-    Min = -5,
-    Max = 20,
-    Rounding = 1,
-    Callback = function(Value)
-        MiscHipHeight = Value
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChildOfClass("Humanoid") then
-            char:FindFirstChildOfClass("Humanoid").HipHeight = Value
-        end
-    end
-})
+local WatermarkRight = Tabs["Misc"]:AddRightGroupbox("Watermark")
 
-MiscLeft:AddSlider("MiscFOV", {
-    Text = "FOV",
-    Default = 70,
-    Min = 30,
-    Max = 120,
-    Rounding = 0,
-    Callback = function(Value)
-        MiscFOV = Value
-        Camera.FieldOfView = Value
-    end
-})
-
-local MiscRight = Tabs["Misc"]:AddRightGroupbox("Anti-Aim Pro & Underground")
-
-MiscRight:AddToggle("AntiAimToggle", {
-    Text = "ENABLED ANTI-AIM",
+WatermarkRight:AddToggle("WatermarkEnabledToggle", {
+    Text = "ENABLED",
     Default = false,
     Callback = function(Value)
-        AntiAimEnabled = Value
-        local char = LocalPlayer.Character
-        local hum = char and char:FindFirstChildOfClass("Humanoid")
-        if hum then
-            hum.AutoRotate = not Value
-        end
+        WatermarkEnabled = Value
+        WatermarkLabel.Visible = Value
     end
-})
-
-MiscRight:AddDropdown("AntiAimModeDropdown", {
-    Values = {"Spin", "Jitter", "Random 360", "Backward", "Sideways", "Zero"},
-    Default = 1,
-    Multi = false,
-    Text = "Anti-Aim Yaw Mode",
+}):AddColorPicker("WatermarkColorPicker", {
+    Default = WatermarkColor,
     Callback = function(Value)
-        AntiAimMode = Value
+        WatermarkColor = Value
+        WatermarkLabel.TextColor3 = Value
     end
 })
 
-MiscRight:AddDropdown("AntiAimPitchDropdown", {
-    Values = {"None", "Down (Hide Head)", "Up", "Jitter Pitch", "Random"},
-    Default = 1,
-    Multi = false,
-    Text = "Anti-Aim Pitch (Head)",
-    Callback = function(Value)
-        AntiAimPitch = Value
-    end
-})
-
-MiscRight:AddToggle("AntiAimDesyncFlick", {
-    Text = "Desync Micro-Flick",
-    Default = false,
-    Callback = function(Value)
-        AntiAimDesyncFlick = Value
-    end
-})
-
-MiscRight:AddSlider("AntiAimSpeedSlider", {
-    Text = "Anti-Aim Speed",
-    Default = 1000,
-    Min = 100,
-    Max = 5000,
-    Rounding = 0,
-    Callback = function(Value)
-        AntiAimSpeed = Value
-    end
-})
-
-MiscRight:AddSlider("AntiAimIntensitySlider", {
-    Text = "Anti-Aim Jitter Angle",
-    Default = 10,
-    Min = 1,
-    Max = 20,
-    Rounding = 1,
-    Callback = function(Value)
-        AntiAimIntensity = Value
-    end
-})
-
-MiscRight:AddSlider("CameraShakeSlider", {
-    Text = "Camera Shake (Visual)",
-    Default = 0,
-    Min = 0,
-    Max = 10,
-    Rounding = 1,
-    Callback = function(Value)
-        CameraShakeIntensity = Value
-    end
-})
-
-MiscRight:AddToggle("MiscUndergroundToggle", {
-    Text = "Underground (Custom Code)",
-    Default = false,
-    Callback = function(Value)
-        MiscUndergroundEnabled = Value
-    end
-})
-
-local UtilityRight = Tabs["Misc"]:AddRightGroupbox("Utility")
-
-UtilityRight:AddButton("Reset Character", function()
-    local char = LocalPlayer.Character
-    if char and char:FindFirstChildOfClass("Humanoid") then
-        char:FindFirstChildOfClass("Humanoid").Health = 0
-    end
-end)
-
-UtilityRight:AddButton("Rejoin", function()
-    TeleportService:Teleport(game.PlaceId, LocalPlayer)
-end)
-
-UtilityRight:AddButton("Server Hop", function()
-    local servers = {}
-    local req = game:HttpGetAsync("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")
-    local data = game:GetService("HttpService"):JSONDecode(req)
-    for _, v in pairs(data.data) do
-        if v.playing < v.maxPlayers and v.id ~= game.JobId then
-            table.insert(servers, v.id)
-        end
-    end
-    if #servers > 0 then
-        TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[math.random(1, #servers)], LocalPlayer)
-    end
-end)
-
-UtilityRight:AddButton("Copy JobId", function()
-    setclipboard(game.JobId)
-    Library:Notify("JobId copiado", 3)
-end)
-
-UtilityRight:AddButton("Copy PlaceId", function()
-    setclipboard(tostring(game.PlaceId))
-    Library:Notify("PlaceId copiado", 3)
-end)
-
-UtilityRight:AddButton("Copy Game Invite", function()
-    setclipboard("roblox://placeId=" .. game.PlaceId)
-    Library:Notify("Invite copiado", 3)
-end)
-
-UtilityRight:AddToggle("MiscFullbright", {
-    Text = "Fullbright",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            Lighting.Brightness = 2
-            Lighting.ClockTime = 14
-            Lighting.FogEnd = 100000
-            Lighting.GlobalShadows = false
-            Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
-        end
-    end
-})
-
-UtilityRight:AddToggle("MiscRemoveFog", {
-    Text = "Remove Fog",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            Lighting.FogEnd = 100000
-            Lighting.FogStart = 0
-        end
-    end
-})
-
-UtilityRight:AddToggle("MiscNoTextures", {
-    Text = "Remove Textures",
-    Default = false,
-    Callback = function(Value)
-        getgenv().NoTextures = Value
-        if Value then
-            for _, v in pairs(workspace:GetDescendants()) do
-                if v:IsA("Texture") or v:IsA("Decal") then
-                    v.Transparency = 1
-                end
-            end
-        end
-    end
-})
-
-UtilityRight:AddToggle("MiscZoomUnlock", {
-    Text = "Unlock Zoom",
-    Default = false,
-    Callback = function(Value)
-        if Value then
-            LocalPlayer.CameraMaxZoomDistance = 9999
-            LocalPlayer.CameraMinZoomDistance = 0.5
-        else
-            LocalPlayer.CameraMaxZoomDistance = 128
-            LocalPlayer.CameraMinZoomDistance = 0.5
-        end
-    end
-})
-
-UtilityRight:AddToggle("MiscShowFPS", {
+WatermarkRight:AddToggle("WmShowFPS", {
     Text = "Show FPS",
-    Default = false,
+    Default = true,
     Callback = function(Value)
-        getgenv().ShowFPS = Value
+        WatermarkFPS = Value
     end
 })
 
-UtilityRight:AddToggle("MiscShowPing", {
+WatermarkRight:AddToggle("WmShowPing", {
     Text = "Show Ping",
-    Default = false,
+    Default = true,
     Callback = function(Value)
-        getgenv().ShowPing = Value
+        WatermarkPing = Value
+    end
+})
+
+WatermarkRight:AddToggle("WmShowName", {
+    Text = "Show Username",
+    Default = true,
+    Callback = function(Value)
+        WatermarkName = Value
+    end
+})
+
+WatermarkRight:AddToggle("WmShowTime", {
+    Text = "Show Time",
+    Default = true,
+    Callback = function(Value)
+        WatermarkTime = Value
     end
 })
 
@@ -1980,11 +1871,6 @@ local RemsPresets = {
         Options.KillDelaySlider:SetValue(0)
         Options.AutoFireRangeSlider:SetValue(5000)
         Options.PriorityModeDropdown:SetValue("Closest")
-        Toggles.AntiAimToggle:SetValue(true)
-        Options.AntiAimModeDropdown:SetValue("Random 360")
-        Options.AntiAimPitchDropdown:SetValue("Down (Hide Head)")
-        Toggles.AntiAimDesyncFlick:SetValue(true)
-        Options.AntiAimSpeedSlider:SetValue(5000)
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPBox:SetValue(true)
         Toggles.ESPChams:SetValue(true)
@@ -2003,8 +1889,6 @@ local RemsPresets = {
         Options.SideSpeedSlider:SetValue(1500)
         Options.AutoFireRangeSlider:SetValue(10000)
         Options.PriorityModeDropdown:SetValue("VALUE (HP)")
-        Toggles.AntiAimToggle:SetValue(true)
-        Options.AntiAimModeDropdown:SetValue("Jitter")
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPTracer:SetValue(true)
         Toggles.ESPChams:SetValue(true)
@@ -2016,10 +1900,8 @@ local RemsPresets = {
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.UEKillersToggle:SetValue(false)
         Toggles.AxeCounterToggle:SetValue(false)
-        Toggles.AntiAimToggle:SetValue(false)
         Toggles.SpinbotEnabled:SetValue(false)
         Options.MiscSpeedBoost:SetValue(50)
-        Options.MiscFOV:SetValue(85)
         Toggles.ESPEnabled:SetValue(true)
         Toggles.ESPBox:SetValue(true)
         Toggles.ESPName:SetValue(true)
@@ -2035,9 +1917,7 @@ local RemsPresets = {
         Toggles.VoidPhaseToggle:SetValue(false)
         Toggles.UEKillersToggle:SetValue(false)
         Toggles.AxeCounterToggle:SetValue(false)
-        Toggles.AntiAimToggle:SetValue(false)
         Options.MiscSpeedBoost:SetValue(62)
-        Options.MiscFOV:SetValue(95)
         Toggles.MiscInfiniteJump:SetValue(false)
         Toggles.MiscNoFallDamage:SetValue(true)
         Toggles.ESPEnabled:SetValue(true)
@@ -2221,21 +2101,6 @@ local function getClosestTarget(maxDistance)
         end
     end
 
-    if bestPlayer and bestPlayer ~= lastPrioritizedPlayer and isRagebotOn and AutoPrioritized and PriorityMode ~= "Closest" then
-        if tick() - lastNotifyTime > 1.2 then
-            lastNotifyTime = tick()
-            lastPrioritizedPlayer = bestPlayer
-            if PriorityMode == "VALUE (HP)" then
-                local hp = math.floor(bestPlayer.Character:FindFirstChildWhichIsA("Humanoid").Health)
-                Library:Notify("AUTO PRIORIZED (" .. hp .. " HP) - Low Health", 3)
-            elseif PriorityMode == "CHARACTER" then
-                Library:Notify("AUTO PRIORIZED (" .. bestPlayer.Name .. ")", 3)
-            end
-        end
-    elseif not bestPlayer then
-        lastPrioritizedPlayer = nil
-    end
-
     return bestPlayer, bestRoot, bestHead
 end
 
@@ -2294,9 +2159,6 @@ local function updateESP()
         return
     end
 
-    local myChar = LocalPlayer.Character
-    local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
-
     for _, player in ipairs(plrs:GetPlayers()) do
         if player == LocalPlayer then
             removeDrawings(player)
@@ -2318,31 +2180,36 @@ local function updateESP()
             continue
         end
 
-        local dist = myRoot and (myRoot.Position - root.Position).Magnitude or 0
-        if dist > ESPMaxDistance then
-            removeDrawings(player)
-            continue
-        end
-
         local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
         local headPos, headOnScreen = Camera:WorldToViewportPoint(head.Position)
 
         if not Drawings[player] then
             Drawings[player] = {
-                Box = createDrawing("Square", {Thickness = 1, Filled = false, Color = ESPBoxColor, Visible = false}),
-                Name = createDrawing("Text", {Size = 14, Center = true, Outline = true, Color = ESPNameColor, Visible = false}),
-                Distance = createDrawing("Text", {Size = 13, Center = true, Outline = true, Color = Color3.fromRGB(200, 200, 200), Visible = false}),
-                Health = createDrawing("Line", {Thickness = 2, Color = Color3.fromRGB(0, 255, 0), Visible = false}),
-                Tracer = createDrawing("Line", {Thickness = 1, Color = ESPTracerColor, Visible = false}),
-                HeadDot = createDrawing("Circle", {Thickness = 1, Filled = true, Color = Color3.fromRGB(255, 0, 0), Visible = false, Radius = 4}),
-                Arrow = createDrawing("Triangle", {Thickness = 1, Filled = true, Color = Color3.fromRGB(0, 255, 128), Visible = false}),
+                Box = createDrawing("Square", {Thickness = 1, Filled = false, Visible = false}),
+                Name = createDrawing("Text", {Size = 14, Center = true, Outline = true, Visible = false}),
+                Distance = createDrawing("Text", {Size = 13, Center = true, Outline = true, Visible = false}),
+                Health = createDrawing("Line", {Thickness = 2, Visible = false}),
+                Tracer = createDrawing("Line", {Thickness = 1, Visible = false}),
+                HeadDot = createDrawing("Circle", {Thickness = 1, Filled = true, Visible = false, Radius = 4}),
+                Arrow = createDrawing("Triangle", {Thickness = 1, Filled = true, Visible = false}),
+                WeaponText = createDrawing("Text", {Size = 12, Center = true, Outline = true, Visible = false}),
             }
         end
 
         local d = Drawings[player]
         local size = char:GetExtentsSize()
+        local dist = (Camera.CFrame.Position - root.Position).Magnitude
         local scale = (size.Y * Camera.ViewportSize.Y) / (dist * 2) * 0.4
         local boxW, boxH = scale * 0.6, scale
+
+        -- Update Colors dynamically
+        d.Box.Color = ESPBoxColor
+        d.Name.Color = ESPNameColor
+        d.Distance.Color = ESPDistanceColor
+        d.Tracer.Color = ESPTracerColor
+        d.HeadDot.Color = ESPHeadDotColor
+        d.Arrow.Color = ESPArrowColor
+        d.WeaponText.Color = ESPWeaponColor
 
         if onScreen then
             if ESPBox then
@@ -2380,7 +2247,20 @@ local function updateESP()
             end
 
             if ESPTracer then
-                d.Tracer.From = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                local originVector = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                pcall(function()
+                    if FighterController and FighterController.LocalFighter and FighterController.LocalFighter.EquippedItem then
+                        local item = FighterController.LocalFighter.EquippedItem
+                        local part = item.Model or item.Handle or item.Part
+                        if part and part:IsA("BasePart") then
+                            local weaponScreenPos, weaponOnScreen = Camera:WorldToViewportPoint(part.Position)
+                            if weaponOnScreen then
+                                originVector = Vector2.new(weaponScreenPos.X, weaponScreenPos.Y)
+                            end
+                        end
+                    end
+                end)
+                d.Tracer.From = originVector
                 d.Tracer.To = Vector2.new(pos.X, pos.Y + boxH/2)
                 d.Tracer.Visible = true
             else
@@ -2394,6 +2274,31 @@ local function updateESP()
                 d.HeadDot.Visible = false
             end
 
+            if ESPWeapon then
+                local weaponName = "Unknown"
+                pcall(function()
+                    if player.Character then
+                        -- Buscar ObjectID o nombre del arma equipada del enemigo
+                        local fighterObj = nil
+                        if getrenv and getrenv().FighterController then
+                            -- Intento de extraer mediante clases del juego si existen
+                        end
+                        -- Alternativa usando atributos o nombres de objetos activos
+                        for _, itemChild in ipairs(player.Character:GetChildren()) do
+                            if itemChild:IsA("Model") or itemChild:IsA("Tool") then
+                                weaponName = itemChild.Name
+                                break
+                            end
+                        end
+                    end
+                end)
+                d.WeaponText.Text = "[" .. tostring(weaponName) .. "]"
+                d.WeaponText.Position = Vector2.new(pos.X, pos.Y + boxH/2 + 16)
+                d.WeaponText.Visible = true
+            else
+                d.WeaponText.Visible = false
+            end
+
             d.Arrow.Visible = false
         else
             d.Box.Visible = false
@@ -2402,6 +2307,7 @@ local function updateESP()
             d.Health.Visible = false
             d.Tracer.Visible = false
             d.HeadDot.Visible = false
+            d.WeaponText.Visible = false
 
             if ESPOffscreenArrows then
                 local screenCenter = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
@@ -2419,7 +2325,7 @@ local function updateESP()
         if ESPChams then
             if not Highlights[player] then
                 local highlight = Instance.new("Highlight")
-                highlight.FillColor = Color3.fromRGB(0, 255, 128)
+                highlight.FillColor = ESPChamsColor
                 highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
                 highlight.FillTransparency = 0.5
                 highlight.OutlineTransparency = 0
@@ -2428,6 +2334,7 @@ local function updateESP()
                 Highlights[player] = highlight
             else
                 Highlights[player].Adornee = char
+                Highlights[player].FillColor = ESPChamsColor
             end
         else
             if Highlights[player] then
@@ -2438,32 +2345,33 @@ local function updateESP()
     end
 end
 
-RunService.Heartbeat:Connect(function()
-    if isRagebotOn and isManipulacionOn then
-        bringAllToMe()
-    end
-end)
-
-RunService.Stepped:Connect(function()
-    if not MiscUndergroundEnabled then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    if not hrp then return end
-
-    local targetCFrame = hrp.CFrame - Vector3.new(0, 5, 0)
-    for _, part in ipairs(char:GetDescendants()) do
-        if part:IsA("BasePart") then
-            part.CanCollide = false
-        end
-    end
-    hrp.CFrame = targetCFrame
-    hrp.AssemblyLinearVelocity = Vector3.zero
-    hrp.AssemblyAngularVelocity = Vector3.zero
-end)
-
-RunService.RenderStepped:Connect(function(dt)
+-- Watermark Update Loop
+RunService.RenderStepped:Connect(function()
     updateESP()
+
+    if WatermarkEnabled then
+        local parts = {}
+        if WatermarkFPS then
+            local fps = math.floor(1 / RunService.RenderStepped:Wait())
+            table.insert(parts, fps .. " FPS")
+        end
+        if WatermarkPing then
+            local ping = 0
+            pcall(function()
+                ping = math.floor(LocalPlayer:GetNetworkPing() * 1000)
+            end)
+            table.insert(parts, ping .. "ms")
+        end
+        if WatermarkName then
+            table.insert(parts, LocalPlayer.Name)
+        end
+        if WatermarkTime then
+            table.insert(parts, os.date("%H:%M:%S"))
+        end
+
+        WatermarkLabel.Text = "  " .. table.concat(parts, " | ") .. "  "
+        WatermarkLabel.Size = UDim2.new(0, WatermarkLabel.TextBounds.X + 20, 0, 26)
+    end
 
     local char = LocalPlayer.Character
     if char then
@@ -2479,13 +2387,9 @@ RunService.RenderStepped:Connect(function(dt)
             if MiscJumpPower ~= 50 then
                 hum.JumpPower = MiscJumpPower
             end
-            if MiscHipHeight ~= 2 then
-                hum.HipHeight = MiscHipHeight
-            end
             if getgenv().AntiSit then
                 hum.Sit = false
             end
-            hum.AutoRotate = not AntiAimEnabled
         end
 
         if getgenv().Noclip then
@@ -2498,61 +2402,6 @@ RunService.RenderStepped:Connect(function(dt)
 
         if SpinbotEnabled and hrp then
             hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(SpinbotSpeed * 0.05), 0)
-        end
-
-        if AntiAimEnabled and hrp then
-            local camLook = Camera.CFrame.LookVector
-            local baseYaw = math.atan2(-camLook.X, -camLook.Z)
-            local yawOffset = 0
-            local pitchOffset = 0
-
-            if AntiAimMode == "Spin" then
-                antiAimAngle = (antiAimAngle + (AntiAimSpeed * dt)) % 360
-                yawOffset = math.rad(antiAimAngle)
-            elseif AntiAimMode == "Jitter" then
-                local side = (math.floor(tick() * (AntiAimSpeed * 0.05)) % 2 == 0) and 1 or -1
-                yawOffset = math.rad(180 + (side * (AntiAimIntensity * 8)))
-            elseif AntiAimMode == "Random 360" then
-                yawOffset = math.rad(math.random(0, 360))
-            elseif AntiAimMode == "Backward" then
-                yawOffset = math.rad(180)
-            elseif AntiAimMode == "Sideways" then
-                local side = (math.floor(tick() * 20) % 2 == 0) and 90 or -90
-                yawOffset = math.rad(side)
-            elseif AntiAimMode == "Zero" then
-                baseYaw = 0
-                yawOffset = 0
-            end
-
-            if AntiAimPitch == "Down (Hide Head)" then
-                pitchOffset = math.rad(-89)
-            elseif AntiAimPitch == "Up" then
-                pitchOffset = math.rad(89)
-            elseif AntiAimPitch == "Jitter Pitch" then
-                pitchOffset = math.rad((math.floor(tick() * 30) % 2 == 0) and -89 or 89)
-            elseif AntiAimPitch == "Random" then
-                pitchOffset = math.rad(math.random(-89, 89))
-            end
-
-            local finalPos = hrp.Position
-            if AntiAimDesyncFlick and (tick() - lastFlickTime > 0.06) then
-                lastFlickTime = tick()
-                local flickOffset = Vector3.new(
-                    (math.random() - 0.5) * 2.5,
-                    0,
-                    (math.random() - 0.5) * 2.5
-                )
-                finalPos = finalPos + flickOffset
-            end
-
-            hrp.CFrame = CFrame.new(finalPos) * CFrame.Angles(0, baseYaw + yawOffset, 0) * CFrame.Angles(pitchOffset, 0, 0)
-            hrp.AssemblyAngularVelocity = Vector3.zero
-        end
-
-        if CameraShakeIntensity > 0 then
-            local shakeX = (math.random() - 0.5) * CameraShakeIntensity * 0.2
-            local shakeY = (math.random() - 0.5) * CameraShakeIntensity * 0.2
-            Camera.CFrame = Camera.CFrame * CFrame.Angles(math.rad(shakeX), math.rad(shakeY), 0)
         end
     end
 end)
@@ -2572,8 +2421,6 @@ LocalPlayer.CharacterAdded:Connect(function(char)
     if hum then
         hum.WalkSpeed = MiscSpeedBoost
         hum.JumpPower = MiscJumpPower
-        hum.HipHeight = MiscHipHeight
-        hum.AutoRotate = not AntiAimEnabled
     end
 end)
 
@@ -2603,7 +2450,6 @@ end)
 
 RunService.RenderStepped:Connect(function()
     if not isUEKillersOn then return end
-    
     if not hasValidWeaponAndObjectID() then return end
     
     local hasValidEnemy = false
@@ -2629,7 +2475,6 @@ RunService.RenderStepped:Connect(function()
     
     if hrp then
         hrp.Velocity = Vector3.new(0, currentSpeed, 0)
-        
         if ueNoCollision then
             for _, part in ipairs(character:GetDescendants()) do
                 if part:IsA("BasePart") then
