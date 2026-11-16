@@ -1,4 +1,4 @@
-local RIVALS_GAME_ID = 6035872082
+Local RIVALS_GAME_ID = 6035872082
 local function notSupportedKick()
     local msg = "this game not supported"
     warn("[shako.win] " .. msg .. " | GameId=" .. tostring(game.GameId))
@@ -55,15 +55,16 @@ local function getSlotNumber()
 end
 
 local currentSpeed = 100000000
-local currentStuds = 50
+local ueInterval = 5
+local ueTpDuration = 0.15
+local ueLastCycle = 0
+
 local isUEKillersOn = false
 local isAxeCounterOn = false
 local isRagebotOn = false
 local isManipulacionOn = false
 local isInVoidPhase = false
 local VoidPhaseEnabled = false
-local lockedYPosition = nil
-local initialPosition = nil
 
 local rageOffsetX = 0
 local rageOffsetY = 0
@@ -77,8 +78,6 @@ local randomWords = {"APOCALYPSE", "DESTROYING", "ANNIHILATING", "GODMODE", "RAG
 
 local AutoPrioritized = true
 local PriorityMode = "Closest"
-local lastPrioritizedPlayer = nil
-local lastNotifyTime = 0
 local playerVelocityHistory = {}
 
 local ResolverEnabled = false
@@ -101,9 +100,6 @@ local ueGodmode = true
 local ueAutoEquip = true
 local ueShoot = true
 
-local MiscUndergroundEnabled = false
-
--- ESP Configs & Colors
 local ESPEnabled = false
 local ESPBox = false
 local ESPBoxColor = Color3.fromRGB(0, 255, 128)
@@ -128,12 +124,10 @@ local ESPHeadDotColor = Color3.fromRGB(255, 0, 0)
 local ESPOffscreenArrows = false
 local ESPArrowColor = Color3.fromRGB(0, 255, 128)
 
--- Weapon Chams (Local Client / Viewmodel)
 local WeaponChamsEnabled = false
 local WeaponChamsMaterial = "Neon"
 local WeaponChamsColor = Color3.fromRGB(0, 255, 255)
 
--- Viewmodel Customizer Configs (Local Client)
 local ViewmodelCustomizerEnabled = false
 local VM_X = 0
 local VM_Y = 0
@@ -144,7 +138,6 @@ local VM_RotZ = 0
 
 local ESPTeamCheck = true
 
--- Watermark Configs
 local WatermarkEnabled = false
 local WatermarkFPS = true
 local WatermarkPing = true
@@ -180,7 +173,6 @@ StatusLabel.Font = Enum.Font.Code
 StatusLabel.Text = "VOID"
 StatusLabel.Parent = RageGui
 
--- Watermark UI Setup
 local WatermarkLabel = Instance.new("TextLabel")
 WatermarkLabel.Name = "WatermarkLabel"
 WatermarkLabel.Size = UDim2.new(0, 300, 0, 30)
@@ -231,50 +223,31 @@ MainGroup:AddToggle("UEKillersToggle", {
     Default = false,
     Callback = function(Value)
         isUEKillersOn = Value
+        if Value then
+            ueLastCycle = tick()
+        end
+    end
+})
+
+MainGroup:AddSlider("UEIntervalSlider", {
+    Text = "TP Interval (Segundos)",
+    Default = 5,
+    Min = 1,
+    Max = 15,
+    Rounding = 1,
+    Callback = function(Value)
+        ueInterval = Value
     end
 })
 
 MainGroup:AddSlider("SpeedSlider", {
-    Text = "Velocidad Extrema",
+    Text = "Velocidad Void",
     Default = 100000000,
     Min = 100000000,
     Max = 999999999,
     Rounding = 0,
     Callback = function(Value)
         currentSpeed = Value
-    end
-})
-
-MainGroup:AddSlider("StudsSlider", {
-    Text = "Distancia Studs",
-    Default = 50,
-    Min = 1,
-    Max = 500,
-    Rounding = 0,
-    Callback = function(Value)
-        currentStuds = Value
-    end
-})
-
-MainGroup:AddSlider("VerticalRangeSlider", {
-    Text = "Vertical Range",
-    Default = 80,
-    Min = 20,
-    Max = 200,
-    Rounding = 0,
-    Callback = function(Value)
-        verticalRange = Value
-    end
-})
-
-MainGroup:AddSlider("TeleportIntensitySlider", {
-    Text = "Teleport Intensity",
-    Default = 1,
-    Min = 0.3,
-    Max = 2,
-    Rounding = 1,
-    Callback = function(Value)
-        teleportIntensity = Value
     end
 })
 
@@ -2202,32 +2175,6 @@ local function getClosestTarget(maxDistance)
     return bestPlayer, bestRoot, bestHead
 end
 
-local function bringAllToMe()
-    local character = LocalPlayer.Character
-    if not character then return end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-
-    local targetCFrame = rootPart.CFrame
-
-    for _, player in ipairs(plrs:GetPlayers()) do
-        if player ~= LocalPlayer then
-            local enemyChar = player.Character
-            if enemyChar then
-                local enemyRoot = enemyChar:FindFirstChild("HumanoidRootPart")
-                if enemyRoot then
-                    for _, part in ipairs(enemyChar:GetDescendants()) do
-                        if part:IsA("BasePart") then
-                            part.CanCollide = false
-                        end
-                    end
-                    enemyRoot.CFrame = targetCFrame
-                end
-            end
-        end
-    end
-end
-
 local function createDrawing(class, props)
     local d = Drawing.new(class)
     for k, v in pairs(props or {}) do
@@ -2249,7 +2196,6 @@ local function removeDrawings(player)
     end
 end
 
--- Weapon Chams aplicado EXCLUSIVAMENTE al arma del cliente (LocalPlayer)
 local function updateWeaponChams()
     if not WeaponChamsEnabled then return end
     
@@ -2272,7 +2218,6 @@ local function updateWeaponChams()
     end)
 end
 
--- Viewmodel Customizer aplicado EXCLUSIVAMENTE al cliente
 local function updateViewmodel()
     if not ViewmodelCustomizerEnabled then return end
     pcall(function()
@@ -2336,7 +2281,6 @@ local function updateESP()
         local scale = (size.Y * Camera.ViewportSize.Y) / (dist * 2) * 0.4
         local boxW, boxH = scale * 0.6, scale
 
-        -- Update Colors dynamically
         d.Box.Color = ESPBoxColor
         d.Name.Color = ESPNameColor
         d.Distance.Color = ESPDistanceColor
@@ -2452,7 +2396,6 @@ local function updateESP()
     end
 end
 
--- Watermark & General Loops
 RunService.RenderStepped:Connect(function()
     updateESP()
     updateWeaponChams()
@@ -2560,102 +2503,94 @@ end)
 RunService.RenderStepped:Connect(function()
     if not isUEKillersOn then return end
     if not hasValidWeaponAndObjectID() then return end
-    
-    local hasValidEnemy = false
-    for _, player in ipairs(plrs:GetPlayers()) do
-        if isTargetValid(player) then
-            hasValidEnemy = true
-            break
-        end
-    end
-    if not hasValidEnemy then return end
+
+    local targetPlayer, targetRoot, targetHead = getClosestTarget(math.huge)
+    if not targetPlayer or not targetRoot or not targetHead then return end
 
     local character = LocalPlayer.Character
     if not character then return end
-    
+
     local hrp = character:FindFirstChild("HumanoidRootPart")
     local humanoid = character:FindFirstChildOfClass("Humanoid")
-    
+    if not hrp then return end
+
     if ueAutoEquip and FighterController and FighterController.LocalFighter then
         pcall(function()
             FighterController.LocalFighter:EquipItem(getSlotNumber())
         end)
     end
-    
-    if hrp then
-        hrp.Velocity = Vector3.new(0, currentSpeed, 0)
-        if ueNoCollision then
-            for _, part in ipairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
+
+    if ueNoCollision then
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = false
             end
         end
     end
-    
-    if hrp then
-        local _, targetRoot, _ = getClosestTarget()
-        if targetRoot then
-            local dist = (targetRoot.Position - hrp.Position).Magnitude
-            if dist <= currentStuds then
-                local intensity = teleportIntensity
-                local randomX = math.random(-currentStuds, currentStuds) * intensity
-                local randomY = math.random(-verticalRange, currentStuds) * intensity
-                local randomZ = math.random(-currentStuds, currentStuds) * intensity
-                hrp.CFrame = hrp.CFrame + Vector3.new(randomX, randomY, randomZ)
-            end
-        end
-    end
-    
+
     if humanoid and ueGodmode then
         humanoid.MaxHealth = math.huge
         humanoid.Health = math.huge
     end
-    
-    if ueShoot and getgenv().Config.Enabled then
-        local targetPlayer, targetHead, targetRoot = getClosestTarget(autoFireRange)
-        if targetPlayer and targetHead and targetRoot and hrp then
-            if FighterController and FighterController.LocalFighter then
-                local item = FighterController.LocalFighter.EquippedItem
-                if item and util and enum then
-                    local originPos = hrp.Position
-                    local targetPos = targetHead.Position
-                    local aimCF = CFrame.lookAt(originPos, targetPos)
-                    local targetCF = targetHead.CFrame
 
-                    local randomOffset = Vector3.new(
-                        (math.random() - 0.5) * 0.05,
-                        (math.random() - 0.5) * 0.05,
-                        (math.random() - 0.5) * 0.05
-                    )
-                    local aimedPos = targetPos + randomOffset
-                    local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+    local now = tick()
+    local elapsed = now - ueLastCycle
 
-                    local cameradata = {}
-                    cameradata[utf8.char(1)] = {
-                        [utf8.char(0)] = util:EncodeCFrame(aimCF),
-                        [utf8.char(1)] = util:EncodeCFrame(targetCF),
-                        [utf8.char(2)] = targetHead,
-                        [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
-                    }
+    if elapsed >= ueInterval then
+        if elapsed <= (ueInterval + ueTpDuration) then
+            hrp.CFrame = CFrame.new(targetRoot.Position) * CFrame.Angles(math.rad(-90), 0, 0)
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
 
-                    pcall(function()
-                        repS.Remotes.Replication.Fighter.UseItem:FireServer(
-                            item:Get("ObjectID"),
-                            enum:ToEnum("StartShooting"),
-                            cameradata,
-                            nil
+            if ueShoot and getgenv().Config.Enabled then
+                if FighterController and FighterController.LocalFighter then
+                    local item = FighterController.LocalFighter.EquippedItem
+                    if item and util and enum then
+                        local originPos = hrp.Position
+                        local targetPos = targetHead.Position
+                        local aimCF = CFrame.lookAt(originPos, targetPos)
+                        local targetCF = targetHead.CFrame
+
+                        local randomOffset = Vector3.new(
+                            (math.random() - 0.5) * 0.05,
+                            (math.random() - 0.5) * 0.05,
+                            (math.random() - 0.5) * 0.05
                         )
-                    end)
+                        local aimedPos = targetPos + randomOffset
+                        local objSpaceHeadOffset = targetHead.CFrame:ToObjectSpace(CFrame.new(aimedPos))
+
+                        local cameradata = {}
+                        cameradata[utf8.char(1)] = {
+                            [utf8.char(0)] = util:EncodeCFrame(aimCF),
+                            [utf8.char(1)] = util:EncodeCFrame(targetCF),
+                            [utf8.char(2)] = targetHead,
+                            [utf8.char(3)] = util:EncodeCFrame(objSpaceHeadOffset)
+                        }
+
+                        pcall(function()
+                            repS.Remotes.Replication.Fighter.UseItem:FireServer(
+                                item:Get("ObjectID"),
+                                enum:ToEnum("StartShooting"),
+                                cameradata,
+                                nil
+                            )
+                        end)
+                    end
                 end
             end
+        else
+            ueLastCycle = now
         end
+    else
+        hrp.CFrame = CFrame.new(targetRoot.Position.X, 5000000, targetRoot.Position.Z)
+        hrp.AssemblyLinearVelocity = Vector3.new(0, currentSpeed, 0)
+        hrp.AssemblyAngularVelocity = Vector3.zero
     end
 end)
 
 RunService.RenderStepped:Connect(function()
     if not isAxeCounterOn then 
-        lockedYPosition = nil
+        nilLockedYPosition = nil
         initialPosition = nil
         return 
     end
